@@ -1,0 +1,14 @@
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.vscode/
+.idea/
+downloads/
+data/
+node_modules/
+tests/
+CLAUDE.md

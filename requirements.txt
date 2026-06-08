@@ -1,0 +1,15 @@
+--extra-index-url https://download.pytorch.org/whl/cu126
+
+torch==2.12.0+cu126
+sentence-transformers>=5.0
+openai>=1.0
+pydantic>=2.0
+python-dotenv>=1.0
+jieba>=0.42
+rank-bm25>=0.2
+tavily-python>=0.7
+trafilatura>=2.0
+tiktoken>=0.13
+mcp>=1.27
+fastmcp>=3.4
+pytest>=9.0
