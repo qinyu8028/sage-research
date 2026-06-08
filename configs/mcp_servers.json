@@ -1,22 +1,45 @@
 {
+  "brave-search": {
+    "command": "npx",
+    "args": ["-y", "@brave/brave-search-mcp-server"],
+    "env": {
+      "BRAVE_API_KEY": "${BRAVE_API_KEY}"
+    }
+  },
+  "fetch": {
+    "command": "uvx",
+    "args": ["mcp-server-fetch"]
+  },
+  "paper-search": {
+    "command": "uv",
+    "args": ["tool", "run", "paper-search-mcp"],
+    "env": {
+      "PAPER_SEARCH_MCP_UNPAYWALL_EMAIL": "${UNPAYWALL_EMAIL}"
+    }
+  },
+  "pdfmux": {
+    "command": "npx",
+    "args": ["-y", "pdfmux-mcp"]
+  },
+  "tavily": {
+    "command": "npx",
+    "args": ["-y", "tavily-mcp@latest"],
+    "env": {
+      "TAVILY_API_KEY": "${TAVILY_API_KEY}"
+    }
+  },
   "github": {
     "command": "docker",
     "args": [
-      "run", 
-      "-i", 
-      "--rm", 
-      "-e", 
-      "GITHUB_PERSONAL_ACCESS_TOKEN", 
+      "run",
+      "-i",
+      "--rm",
+      "-e",
+      "GITHUB_PERSONAL_ACCESS_TOKEN",
       "ghcr.io/github/github-mcp-server"
     ],
     "env": {
       "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
     }
-  },
-  "arxiv": {
-    "command": "python",
-    "args": [
-      "my_agent/mcp_client/arxiv_server.py"
-    ]
   }
 }

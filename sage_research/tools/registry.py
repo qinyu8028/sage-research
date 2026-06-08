@@ -1,3 +1,4 @@
+from typing import Any
 from .base_tool import Tool
 
 
@@ -5,23 +6,31 @@ class ToolRegistry:
     """工具注册表"""
 
     def __init__(self):
-        self.tools = {}
+        self.tools: dict[str, Tool] = {}
 
     def register_tool(self, tool: Tool):
         if tool.name in self.tools:
             print(f"⚠️ 警告:工具 '{tool.name}' 已存在，将被覆盖。")
         self.tools[tool.name] = tool
 
-    def get_tool(self, name: str) -> Tool:
-        if name in self.tools:
-            tool = self.tools[name]
-            return tool
-        else:
-            return f"⚠️ 调用工具时发生错误: 不存在名称为{name}的工具，请检查输入"
+    def get_tools(self, whitelist: list[str]) -> list[Tool]:
+        tool_list = []
+        for name in whitelist:
+            if name in self.tools:
+                tool = self.tools[name]
+                tool_list.append(tool)
+            else:
+                raise ValueError(f"⚠️ 调用工具时发生错误: 不存在名称为{name}的工具，请检查输入")
 
-    def get_all_schemas(self) -> list:
+        return tool_list
+
+    def get_schemas(self, whitelist: list[str]) -> list[dict[str, Any]]:
         schemas = []
-        for name, tool in self.tools.items():
-            schema = tool.to_schema()
-            schemas.append(schema)
+        for name in whitelist:
+            if name in self.tools:
+                schema = self.tools[name].to_schema()
+                schemas.append(schema)
+            else:
+                raise ValueError(f"⚠️ 调用工具时发生错误: 不存在名称为{name}的工具，请检查输入")
+
         return schemas

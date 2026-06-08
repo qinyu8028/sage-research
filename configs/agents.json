@@ -1,0 +1,29 @@
+{
+    "router": {
+      "allowed_tools": []
+    },
+    "planner": {
+      "allowed_tools": [
+        "memory_search"
+      ]
+    },
+    "researcher": {
+      "allowed_tools": [
+        "mcp__brave-search__brave_web_search",
+        "mcp__fetch__fetch",
+        "mcp__paper-search__search_papers",
+        "mcp__paper-search__download_with_fallback",
+        "mcp__pdfmux__convert_pdf",
+        "mcp__github__search_repositories",
+        "mcp__github__get_file_contents",
+        "mcp__github__search_code",
+        "rag_search"
+      ]
+    },
+    "reviewer": {
+      "allowed_tools": []
+    },
+    "writer": {
+      "allowed_tools": []
+    }
+  }
