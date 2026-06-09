@@ -1,10 +1,10 @@
 from typing import Any
 
-from .base_tool import Tool, ToolParameter
+from .base_tool import BaseTool, ToolParameter
 from ..rag import Pipeline
 
 
-class RAGTool(Tool):
+class RAGTool(BaseTool):
     def __init__(self, pipeline: Pipeline):
         super().__init__(
             name="rag_search",

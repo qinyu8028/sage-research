@@ -1,10 +1,10 @@
 from typing import Any
 
 from ..memory.manager import MemoryManager
-from .base_tool import Tool, ToolParameter
+from .base_tool import BaseTool, ToolParameter
 
 
-class WorkingMemoryTool(Tool):
+class WorkingMemoryTool(BaseTool):
     def __init__(self, memory_manager: MemoryManager):
         super().__init__(
             name="working_memory",
@@ -36,7 +36,7 @@ class WorkingMemoryTool(Tool):
         return "Working memory saved."
 
 
-class SemanticMemoryTool(Tool):
+class SemanticMemoryTool(BaseTool):
     def __init__(self, memory_manager: MemoryManager):
         super().__init__(
             name="semantic_memory",

@@ -1,11 +1,11 @@
 from typing import Any
 
-from ..tools import Tool
+from ..tools import BaseTool
 from .client import MCPClient
 from ..tools import ToolRegistry
 
 
-class MCPTool(Tool):
+class MCPTool(BaseTool):
     """
     Adapt mcp tools into our own tool base class.
     """

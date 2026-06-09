@@ -11,7 +11,7 @@ class ToolParameter(BaseModel):
     required: bool = True
     default: Any = None
 
-class Tool(ABC):
+class BaseTool(ABC):
     """工具基类"""
     def __init__(self, name: str, description: str, parameters: list[ToolParameter]):
         self.name = name
