@@ -96,7 +96,7 @@ class MCPClient:
 
         if result.isError:
             return f"工具调用失败: {result.content[0].text}"
-        return result.content[0].text
+        return "\n".join(item.text for item in result.content)
 
     def disconnect(self):
         if self._thread is None:
