@@ -29,17 +29,21 @@ class TestAgent:
         )
 
     def invoke(
-        self, messages: list[dict[str, str]], temperature: float = 0, tools=None
+        self, messages: list[dict[str, str]], temperature: float = 0, tools=None, tool_choice=None
     ) -> ChatCompletionMessage:
         print(f"🧠 正在调用 {self.model} 模型...")
+
+        if tool_choice is None:
+            tool_choice = "auto" if tools else None
 
         response = self.client.chat.completions.create(
             messages=messages,
             model=self.model,
             temperature=temperature,
-            tool_choice="auto" if tools else None,
+            tool_choice=tool_choice,
             tools=tools if tools else None,
         )
+        
         return response.choices[0].message
 
 

@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🔍 Sage Research
+# 🔍 SAGE Research
 
 **S**earch · **A**nalyze · **G**enerate · **E**valuate
 

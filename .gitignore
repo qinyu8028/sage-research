@@ -12,4 +12,5 @@ data/
 node_modules/
 tests/
 CLAUDE.md
+.claude/
 docs/
