@@ -14,6 +14,8 @@ from .prompts import (
 
 
 class Researcher(AgentBase):
+    """ReAct 循环研究员，接收子问题后通过工具搜索、观察、推理，输出经压缩的研究笔记。"""
+
     def __init__(
         self,
         name: str,
@@ -29,11 +31,11 @@ class Researcher(AgentBase):
         self.tool_schema = [tool.to_schema() for tool in tool_list]
         self._tool_map = {tool.name: tool for tool in tool_list}
 
-    def run(self, sub_question: str, feedback: str | None = None) -> str:
-        if not feedback:
+    def run(self, sub_question: str, note_feedback: str | None = None) -> str:
+        if not note_feedback:
             prompt = RESEARCHER_USER_PROMPT.format(sub_question=sub_question)
         else:
-            prompt = RESEARCHER_RETRY_USER_PROMPT.format(sub_question=sub_question, feedback=feedback)
+            prompt = RESEARCHER_RETRY_USER_PROMPT.format(sub_question=sub_question, note_feedback=note_feedback)
 
         user_msg = Message(role="user", content=prompt)
         self._history.append(user_msg)
