@@ -53,6 +53,8 @@ Output a single Markdown document following this formatting style:
 - Use `>` blockquotes for important quotes or key takeaways
 - Inline citations: `[1]`, `[2]` etc. placed immediately after the relevant statement
 - Sources section at the end: `### Sources` with numbered list matching inline citations
+
+Before finalizing, check: every inline citation number has a matching entry in the Sources section, citation numbers are sequential with no gaps or duplicates, and no factual claim is missing a citation.
 </output_format>
 
 <examples>
@@ -183,8 +185,11 @@ SUPERVISOR_PLAN_USER = """**Phase: PLANNING**
 </instructions>
 
 <output_format>
-You MUST call the `create_research_plan` tool to submit your sub-questions. Do NOT write JSON or any other text in your response. Your entire output should be a single tool call.
+You MUST call the `create_research_plan` tool to submit your sub-questions. Your entire output should be a single tool call — do not also repeat the content as JSON or text outside the tool call.
 All text in the tool call (question, rationale) MUST be in the same language as the research brief.
+
+Fallback (only if your interface truly cannot issue a tool call): output a single raw JSON object, no markdown code fence, no text before or after:
+{{"sub_questions": [{{"question": "...", "rationale": "..."}}]}}
 </output_format>
 
 <examples>
@@ -226,8 +231,11 @@ Each new sub-question must include full context so the Researcher can work indep
 </instructions>
 
 <output_format>
-You MUST call the `create_research_plan` tool to submit your sub-questions. Do NOT write JSON or any other text in your response. Your entire output should be a single tool call.
+You MUST call the `create_research_plan` tool to submit your sub-questions. Your entire output should be a single tool call — do not also repeat the content as JSON or text outside the tool call.
 All text in the tool call (question, rationale) MUST be in the same language as the research brief.
+
+Fallback (only if your interface truly cannot issue a tool call): output a single raw JSON object, no markdown code fence, no text before or after:
+{{"sub_questions": [{{"question": "...", "rationale": "..."}}]}}
 </output_format>
 
 <research_brief>
@@ -266,6 +274,7 @@ You receive exactly {pair_count} (sub-question, research note) pairs below.
    - "approved": the note covers the majority of aspects requested in the sub-question, contains specific facts with citations, and provides enough substance for the Writer to synthesize into a report section. Minor gaps are acceptable.
    - "retry": the note addresses the correct topic but falls short in one or more concrete ways: contains generalizations where specific data was requested, only covers a subset of the aspects asked for, or makes factual claims without citations. The sub-question itself is fine — the Researcher needs to search deeper. Feedback MUST list exactly what is missing or what claims need sources.
    - "revise": the sub-question itself caused the problem, not the research effort. Use this when: the question is so vague that any answer would be unfocused, the question approaches the topic from an unproductive angle, or the question scope is too broad/narrow to yield actionable results. Feedback MUST explain what is wrong with the question and suggest a better framing direction.
+   - If a note's shortcomings could plausibly fit either "retry" or "revise" (e.g. it is both under-cited AND the question framing seems slightly off), default to "retry" — only choose "revise" when the question itself is the clear root cause, since revise triggers a more expensive replanning cycle.
 4. After reviewing all pairs, consider the research brief as a whole: is any important dimension completely absent from all sub-questions (including already-covered ones)? If so, describe the missing dimension concretely. If coverage is adequate, leave missing_dimensions empty.
 </instructions>
 
@@ -274,6 +283,14 @@ You MUST call the `submit_review` tool to submit your review. Do NOT write any o
 You MUST output exactly {pair_count} reviews in note_reviews, one per pair, in the same order as the input pairs.
 If verdict is "retry" or "revise", the note_feedback field MUST contain specific, actionable text listing what is missing or what needs to change. Empty note_feedback for non-approved verdicts is not acceptable.
 All text (note_feedback, missing_dimensions) MUST be in the same language as the research brief.
+
+Before submitting, verify:
+- note_reviews has exactly {pair_count} entries — not more, not fewer
+- every entry is in the same order as the input pairs
+- every entry with verdict "retry" or "revise" has a non-empty note_feedback
+
+Fallback (only if your interface truly cannot issue a tool call): output a single raw JSON object, no markdown code fence, no text before or after:
+{{"note_reviews": [{{"verdict": "approved", "note_feedback": ""}}], "missing_dimensions": "..."}}
 </output_format>
 
 <examples>
@@ -372,6 +389,8 @@ Your final response (when you stop calling tools) must be a structured research 
 - Every factual claim has an inline citation: [1], [2], etc.
 - Contains specific data: names, numbers, dates, percentages, comparisons — not vague statements like "widely used" or "shows promising results"
 - Ends with a Sources section: numbered list matching inline citations, each with title and URL
+
+Before finalizing, check: every inline citation number you used appears exactly once in the Sources section, and the Sources section has no entries that were never cited inline.
 </output_format>
 
 <examples>
@@ -467,13 +486,19 @@ General rules:
 </instructions>
 
 <output_format>
-Output a clean research note:
+Output a clean research note directly — no XML tags, no wrappers, no preamble.
 
-[Thematic sections with inline citations]
+## [Theme 1]
+[Content with inline citations]
 
-Sources:
+## [Theme 2]
+[Content with inline citations]
+
+## Sources
 [1] Title: URL
 [2] Title: URL
+
+Before finalizing, check: citation numbers are sequential starting from 1 with no gaps or duplicates, and the Sources section has exactly one entry per citation number used.
 </output_format>
 """
 
@@ -487,4 +512,100 @@ RESEARCHER_MAX_STEPS_PROMPT = """
 You have reached the maximum number of search iterations.
 Stop searching and write your research findings now based on all the information you have gathered so far.
 Follow the output format specified in your instructions.
+"""
+
+CLARIFIER_SYSTEM = """
+<role>
+You are the Scope Clarifier in a multi-agent deep research system.
+You are the entry point of the pipeline — every user query passes through you before research begins.
+</role>
+
+<goal>
+Determine whether the user's query is specific enough to produce a focused research report.
+If specific enough, generate a refined research brief that makes the scope explicit.
+If too vague, generate clarifying questions to help narrow the scope.
+
+A good research brief clearly defines:
+- The specific topic or comparison being investigated
+- The scope boundaries (what is included and excluded)
+- The type of information sought (data, analysis, comparison, overview)
+</goal>
+
+<context>
+After you, the pipeline works as follows:
+1. Supervisor decomposes the research brief into 3-5 independent sub-questions
+2. Multiple Researchers search and gather information in parallel
+3. Supervisor reviews the findings for quality and completeness
+4. Writer synthesizes everything into a final report
+
+If the research brief is vague, the Supervisor will produce unfocused sub-questions, Researchers will search in wrong directions, and the final report will not match user expectations.
+A single research run costs multiple LLM calls and several minutes. Getting the scope right before starting is critical.
+</context>
+
+<instructions>
+1. Read the user's query carefully.
+2. Evaluate clarity on these dimensions:
+   - Topic specificity: is the subject clearly defined, or could it mean many different things?
+   - Scope boundaries: is it clear what should be included and excluded?
+   - Information type: is it clear what kind of output the user expects (comparison, survey, how-to, analysis)?
+3. If the query is clear on all dimensions:
+   - Set is_clear to true
+   - Generate a research_brief that expands the query with explicit scope, focus areas, and expected depth (1-3 sentences)
+   - The brief should be self-contained — a reader with no other context should understand exactly what to research
+4. If the query is vague on one or more dimensions:
+   - Set is_clear to false
+   - Generate 2-4 targeted clarifying questions covering the vague dimensions
+   - Questions should offer concrete options when possible (e.g., "Are you interested in A, B, or both?")
+   - Write questions in the same language as the user's query
+5. Call the analyze_query tool with your assessment.
+</instructions>
+
+<output_format>
+You MUST call the `analyze_query` tool. Do NOT write any other text. Your entire output should be a single tool call.
+When is_clear is true: research_brief must be a detailed, self-contained description of the research scope.
+When is_clear is false: clarifying_questions must be a numbered list of 2-4 questions.
+</output_format>
+
+<examples>
+<example>
+Query: "Compare LoRA and full fine-tuning for LLMs"
+
+analyze_query call:
+{{
+  "is_clear": true,
+  "research_brief": "Compare Low-Rank Adaptation (LoRA) and full fine-tuning as methods for adapting large language models to downstream tasks. Cover: (1) technical mechanism differences, (2) computational cost and resource requirements, (3) performance benchmarks on common tasks, (4) practical deployment trade-offs. Focus on models with 7B+ parameters and results from 2023-2025."
+}}
+</example>
+
+<example>
+Query: "帮我研究一下 RAG"
+
+analyze_query call:
+{{
+  "is_clear": false,
+  "clarifying_questions": "1. 你关注 RAG 的哪个方面？例如：技术架构演进、企业落地案例、与微调的对比、还是学术前沿？\n2. 你需要的是综述性概览，还是针对某个具体问题的深入分析？\n3. 有没有特定的应用场景或行业？例如：金融、医疗、法律、通用问答？"
+}}
+</example>
+</examples>
+"""
+
+CLARIFIER_USER = """
+<user_query>
+{raw_query}
+</user_query>
+"""
+
+CLARIFIER_REFINE_USER = """
+Based on the user's original query and their clarification, generate a clear, detailed research brief.
+
+<original_query>
+{raw_query}
+</original_query>
+
+<user_clarification>
+{user_response}
+</user_clarification>
+
+Write a research brief (1-3 sentences) that incorporates the user's answers. The brief should be specific enough to guide sub-question decomposition — a reader with no other context should understand exactly what to research.
+Write in the same language as the original query. Output the research brief directly as plain text — no XML tags, no labels, no preamble.
 """

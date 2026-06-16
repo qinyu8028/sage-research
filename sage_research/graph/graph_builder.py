@@ -5,6 +5,7 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.types import Send
 
 from sage_research.agents.supervisor import ReviewResult, SubQuestion
+from sage_research.rag.pipeline import Pipeline
 from ..agents import Supervisor, Writer, Researcher
 
 
@@ -25,10 +26,6 @@ class State(TypedDict):
     final_report: str
     retry_items: list[dict]
 
-# TODO: add clarify node
-# class InputSchema(TypedDict):
-#     raw_query: str
-
 
 class InputSchema(TypedDict):
     research_brief: str
@@ -39,10 +36,11 @@ class OutputSchema(TypedDict):
 
     
 def build_graph(
-    supervisor: Supervisor, 
+    supervisor: Supervisor,
     create_researcher: Callable[[], Researcher],
-    writer: Writer, 
-    max_rounds: int = 3
+    writer: Writer,
+    pipeline: Pipeline,
+    max_rounds: int = 3,
 ):
     builder = StateGraph(
         State, input_schema=InputSchema, output_schema=OutputSchema
@@ -74,9 +72,6 @@ def build_graph(
 
         return "plan_node"
 
-    # TODO: add clarify node
-    # def clarify_node(state: ResearchState):
-
     def plan_node(state: State) -> dict[str, SubQuestion]:
         result = supervisor.plan(
             research_brief=state["research_brief"],
@@ -98,6 +93,14 @@ def build_graph(
             pending_review_pairs=state["pending_review_pairs"],
             approved_pairs=state.get("approved_pairs", [])
         )
+        n_pairs = len(state["pending_review_pairs"])
+        n_reviews = len(result.note_reviews)
+        if n_reviews != n_pairs:
+            print(f"  [review_node] 警告: note_reviews({n_reviews}) != pending_pairs({n_pairs})，截断到 {min(n_reviews, n_pairs)}")
+            for i, nr in enumerate(result.note_reviews):
+                print(f"    [{i}] verdict={nr.verdict}, feedback={nr.note_feedback[:100] if nr.note_feedback else ''}")
+            result.note_reviews = result.note_reviews[:n_pairs]
+
         approved_pairs = [
             state["pending_review_pairs"][i]
             for i, note_review in enumerate(result.note_reviews)
@@ -125,18 +128,16 @@ def build_graph(
             research_brief=state["research_brief"],
             clean_notes=[note for _, note in state["approved_pairs"]],
         )
+        pipeline.add_text(text=result, query=state["research_brief"])
         return {"final_report": result}
 
     # add node
-    # builder.add_node("clarify_node", clarify_node)
     builder.add_node("plan_node", plan_node)
     builder.add_node("research_node", research_node)
     builder.add_node("review_node", review_node)
     builder.add_node("write_node", write_node)
 
     # add edge
-    # builder.add_edge(START, "clarify_node")
-    # builder.add_edge("clarify_node", "plan_node")
     builder.add_edge(START, "plan_node")
     builder.add_conditional_edges("plan_node", hand_out_subquestion, ["research_node"])
     builder.add_edge("research_node", "review_node")

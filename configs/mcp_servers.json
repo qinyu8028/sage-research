@@ -3,7 +3,8 @@
     "command": "npx",
     "args": ["-y", "@brave/brave-search-mcp-server"],
     "env": {
-      "BRAVE_API_KEY": "${BRAVE_API_KEY}"
+      "BRAVE_API_KEY": "${BRAVE_API_KEY}",
+      "NODE_OPTIONS": "--use-env-proxy"
     }
   },
   "fetch": {
@@ -11,21 +12,25 @@
     "args": ["mcp-server-fetch"]
   },
   "paper-search": {
-    "command": "uv",
-    "args": ["tool", "run", "paper-search-mcp"],
+    "command": "python",
+    "args": ["-m", "paper_search_mcp.server"],
     "env": {
       "PAPER_SEARCH_MCP_UNPAYWALL_EMAIL": "${UNPAYWALL_EMAIL}"
     }
   },
   "pdfmux": {
     "command": "npx",
-    "args": ["-y", "pdfmux-mcp"]
+    "args": ["-y", "pdfmux-mcp"],
+    "env": {
+      "NODE_OPTIONS": "--use-env-proxy"
+    }
   },
   "tavily": {
     "command": "npx",
     "args": ["-y", "tavily-mcp@latest"],
     "env": {
-      "TAVILY_API_KEY": "${TAVILY_API_KEY}"
+      "TAVILY_API_KEY": "${TAVILY_API_KEY}",
+      "NODE_OPTIONS": "--use-env-proxy"
     }
   },
   "github": {

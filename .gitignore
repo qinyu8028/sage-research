@@ -7,8 +7,14 @@ dist/
 build/
 .vscode/
 .idea/
-downloads/
-data/
+data/*
+!data/.gitkeep
+!data/rag/
+data/rag/*
+!data/rag/.gitkeep
+!data/downloads/
+data/downloads/*
+!data/downloads/.gitkeep
 node_modules/
 tests/
 CLAUDE.md

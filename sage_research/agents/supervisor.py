@@ -97,6 +97,9 @@ class Supervisor(AgentBase):
             },
         }
 
+    def run(self, prompt: str, **kwargs) -> str:
+        raise NotImplementedError("Supervisor uses plan() and review(), not run()")
+
     def _parse_tool_response(
         self, response: ChatCompletionMessage, expected_func: str, wrap_key: str | None = None
     ) -> dict:
@@ -233,7 +236,7 @@ class Supervisor(AgentBase):
             tools=[self.review_schema],
         )
 
-        result = self._parse_tool_response(response, "submit_review")
+        result = self._parse_tool_response(response, "submit_review", wrap_key="note_reviews")
         self._record_response(response, result)
 
         return ReviewResult(**result)
