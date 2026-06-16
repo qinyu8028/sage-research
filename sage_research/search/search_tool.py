@@ -56,6 +56,10 @@ class SearchTool(BaseTool):
         self.brave_adapter = BraveAdapter(brave_tool)
         self.tavily_adapter = TavilyAdapter(tavily_tool)
 
+    @staticmethod
+    def _format_results(result_list: list) -> str:
+        return "\n\n".join(f"[{i}] {result}" for i, result in enumerate(result_list, 1))
+
     def run_tool(self, parameters: dict[str, Any]) -> str:
         query = parameters.get("query")
         if not query:
@@ -69,31 +73,37 @@ class SearchTool(BaseTool):
         if time_filter is not None:
             kwargs["time_filter"] = time_filter
 
-        # tool fallback mechanism
-        search_succeeded = False
+        brave_error = False
+        tavily_error = False
+
         try:
             result_list = self.brave_adapter.search(**kwargs)
-            search_succeeded = True
-        except Exception:
-            result_list = []
-            search_succeeded = False
+            if result_list:
+                print(f"  [SearchTool] Brave 返回 {len(result_list)} 条结果")
+                return self._format_results(result_list)
+            print(f"  [SearchTool] Brave 返回空结果，尝试 Tavily")
+        except Exception as e:
+            brave_error = True
+            print(f"  [SearchTool] Brave 异常: {e}，fallback 到 Tavily")
 
-        if not result_list:
-            try:
-                result_list = self.tavily_adapter.search(**kwargs)
-                search_succeeded = True
-            except Exception:
-                if not search_succeeded:
-                    search_succeeded = False
+        try:
+            result_list = self.tavily_adapter.search(**kwargs)
+            if result_list:
+                print(f"  [SearchTool] Tavily 返回 {len(result_list)} 条结果")
+                return self._format_results(result_list)
+            print(f"  [SearchTool] Tavily 返回空结果")
+        except Exception as e:
+            tavily_error = True
+            print(f"  [SearchTool] Tavily 异常: {e}")
 
-        if not search_succeeded:
+        if brave_error and tavily_error:
+            print(f"  [SearchTool] 所有搜索源不可用")
             return (
                 "Error: all search services are currently unavailable. "
                 "Continue working with the information you already have."
             )
-        if not result_list:
-            return (
-                f"No results found for query '{query}'. "
-                "Try rephrasing with different or broader keywords."
-            )
-        return "\n\n".join(f"[{i}] {result}" for i, result in enumerate(result_list, 1))
+        print(f"  [SearchTool] 所有搜索源均无结果，query: {query}")
+        return (
+            f"No results found for query '{query}'. "
+            "Try rephrasing with different or broader keywords."
+        )

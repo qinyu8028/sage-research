@@ -1,6 +1,6 @@
 import json
 
-from sage_research.tools.base_tool import BaseTool
+from sage_research.tools.base_tool import BaseTool, ToolCallError
 from ..base import AgentBase, llm_client, Message, Config
 from ..context import ContextBuilder
 from .prompts import (
@@ -50,31 +50,38 @@ class Researcher(AgentBase):
 
             if response.tool_calls:
                 tool_call_msg = Message(
-                    role="assistant", 
-                    content=response.content, 
+                    role="assistant",
+                    content=response.content,
                     tool_calls=[tool_call.model_dump() for tool_call in response.tool_calls]
                 )
                 self._history.append(tool_call_msg)
-            
+
                 for tool_call in response.tool_calls:
                     name = tool_call.function.name
                     parameters = json.loads(tool_call.function.arguments)
-                    
+                    print(f"  [Researcher] 调用工具: {name}({json.dumps(parameters, ensure_ascii=False)[:200]})")
+
                     tool = self._tool_map.get(name)
 
                     if tool is None:
                         tool_result = f"Error: tool '{name}' does not exist. Available tools: {list(self._tool_map.keys())}"
                     else:
-                        tool_result = tool.run_tool(parameters)
-                    
+                        try:
+                            tool_result = tool.run_tool(parameters)
+                            print(f"  [Researcher] 工具结果: {tool_result[:300]}...")
+                        except ToolCallError as e:
+                            tool_result = str(e)
+                            print(f"  [Researcher] 工具失败: {tool_result}")
+
                     tool_result_msg = Message(
-                        role="tool", 
-                        content=tool_result, 
+                        role="tool",
+                        content=tool_result,
                         tool_call_id=tool_call.id
                     )
                     self._history.append(tool_result_msg)
-            
+
             else:
+                print(f"  [Researcher] 推理完成 ({len(response.content)} 字符)")
                 response_msg = Message(role="assistant", content=response.content)
                 self._history.append(response_msg)
                 exhausted = False

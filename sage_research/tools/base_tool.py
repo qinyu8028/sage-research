@@ -47,3 +47,9 @@ class BaseTool(ABC):
                 required.append(parameter.name)
 
         return openai_schema
+
+
+class ToolCallError(Exception):
+    def __init__(self, message: str, tool_name: str = "") -> None:
+        super().__init__(message)
+        self.tool_name = tool_name

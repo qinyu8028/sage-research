@@ -9,6 +9,7 @@ from mcp.types import CallToolResult, Tool
 from pydantic import BaseModel
 from mcp.client.stdio import stdio_client, StdioServerParameters
 from mcp import ClientSession
+from ..tools import ToolCallError
 
 
 class MCPServerConfig(BaseModel):
@@ -95,7 +96,7 @@ class MCPClient:
         result: CallToolResult = future.result()
 
         if result.isError:
-            return f"工具调用失败: {result.content[0].text}"
+            raise ToolCallError(message=f"工具调用失败: {result.content[0].text}", tool_name=name)
         return "\n".join(item.text for item in result.content)
 
     def disconnect(self):
