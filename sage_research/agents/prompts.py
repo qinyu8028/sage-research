@@ -365,20 +365,37 @@ Your findings will be reviewed by the Supervisor. Insufficient depth, missing ci
 
 <instructions>
 1. Read the sub-question carefully. Identify the key aspects it asks you to investigate.
-2. Plan your search strategy before making your first tool call:
-   - Start with the local knowledge base (rag_search) — it may already contain relevant information from previous research sessions
-   - Use web search for current information, recent developments, or topics not covered locally
-   - Use paper search for academic or technical topics that benefit from peer-reviewed sources
-   - When you find a paper on arXiv that mentions a code repository, use GitHub tools to examine the implementation details
-   - Use fetch to retrieve full content from URLs that appear promising in search results
-   - Use PDF tools when you need to extract text from PDF documents
+
+2. Follow this search protocol phase by phase. Do NOT stop at Phase 2 — search snippets alone are too shallow for a quality research note.
+
+   Phase 1 — Local check:
+   Use rag_search to check the local knowledge base. If relevant content exists, use it as your foundation and skip to the gaps.
+
+   Phase 2 — Web scan:
+   Use search to find current information. IMPORTANT: search returns only short snippets (2-3 sentences per result), not full articles. Treat search results as a directory — they tell you WHERE information is, not the information itself. Identify the 1-2 most relevant URLs from the results.
+
+   Phase 3 — Deep retrieval:
+   Use fetch on the most promising URLs from Phase 2 to retrieve full article content. Full articles contain the specific data, numbers, methodology details, and analysis that snippets lack. This is where research depth comes from.
+
+   Phase 4 — Academic sources (for technical/scientific topics):
+   Use search_arxiv or search_google_scholar to find peer-reviewed papers. Academic papers provide authoritative data, precise methodology, and benchmark numbers that blog posts and news articles cannot. Use read_arxiv_paper to access full paper content.
+
+   Phase 5 — Implementation details (when applicable):
+   If any paper or article mentions a code repository, use GitHub tools (search_repositories, get_file_contents) to examine the actual implementation.
+
+   Skip phases that clearly don't apply to your sub-question, but always complete at least Phase 1 through Phase 3.
+
 3. Write specific, targeted queries for each tool call. Broad queries like "RAG" return noise; specific queries like "RAG hybrid retrieval BM25 vector fusion enterprise 2024" return useful results.
+
 4. After receiving each tool result, assess: do I have enough information to thoroughly answer the sub-question? If a specific gap remains, search for that gap next.
+
 5. Stop searching when you have:
    - Covered all key aspects mentioned in the sub-question
    - Concrete facts with sources for each aspect (cross-reference with multiple sources when possible)
    - Enough substance that a Writer could produce a detailed report section from your findings alone
+
 6. Once you have gathered sufficient information, stop calling tools and write your findings directly as your final response.
+
 7. Write in the same language as the sub-question.
 </instructions>
 
@@ -394,6 +411,24 @@ Before finalizing, check: every inline citation number you used appears exactly 
 </output_format>
 
 <examples>
+<example_strategy>
+Sub-question: "What are the memory and compute requirements of LoRA vs full fine-tuning for 7B+ parameter models?"
+
+Good strategy (Phase 1→3→4):
+1. rag_search("LoRA memory requirements 7B models") → no local results
+2. search("LoRA vs full fine-tuning GPU memory comparison 7B parameters 2024") → found 5 snippets, a Medium article and an arXiv link look promising
+3. fetch the Medium article URL → got full article with memory comparison table and benchmark numbers
+4. search_arxiv("LoRA memory efficiency large language models") → found QLoRA paper
+5. read_arxiv_paper on the QLoRA paper → got specific GPU memory numbers for 7B/13B/65B models
+Result: research note has concrete memory numbers, training time comparisons, and authoritative sources
+
+Bad strategy (stops at Phase 2):
+1. rag_search("LoRA") → empty
+2. search("LoRA fine-tuning") → got 5 short snippets
+3. Write findings from snippets alone
+Result: research note has only vague statements like "LoRA uses less memory" with no specific numbers — will be rejected by Supervisor
+</example_strategy>
+
 <example>
 Sub-question: "How does LoRA work for fine-tuning large language models, and what are its computational advantages compared to full fine-tuning?"
 

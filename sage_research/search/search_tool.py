@@ -21,7 +21,8 @@ class SearchTool(BaseTool):
                 "context or previously retrieved documents.\n"
                 "\n"
                 "Returns: a list of search results, each containing title, URL, "
-                "and content snippet."
+                "and a short content snippet (2-3 sentences). "
+                "Snippets are previews only, not full article content."
             ),
             parameters=[
                 ToolParameter(
