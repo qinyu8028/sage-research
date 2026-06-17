@@ -9,7 +9,10 @@
   },
   "fetch": {
     "command": "uvx",
-    "args": ["mcp-server-fetch"]
+    "args": ["mcp-server-fetch"],
+    "env": {
+      "all_proxy": ""
+    }
   },
   "paper-search": {
     "command": "python",

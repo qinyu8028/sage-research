@@ -27,7 +27,7 @@ class Config:
     config_dir: str = "configs"
     data_dir: str = "data"
     max_rounds: int = 3
-    max_steps: int = 6
+    max_steps: int = 3
     llm: LLMConfig = field(default_factory=LLMConfig)
     context: ContextConfig = field(default_factory=ContextConfig)
     compactor: CompactorConfig = field(default_factory=CompactorConfig)
