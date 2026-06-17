@@ -481,32 +481,77 @@ Focus on filling these specific gaps. Do not repeat information you have already
 </reviewer_feedback>
 """
 
-RESEARCHER_COMPRESS_SYSTEM = """
+RESEARCHER_DENOISE_SYSTEM = """
 <role>
-You are a research note editor in a multi-agent deep research system.
-Your job is to clean raw research output into a polished research note.
+You are a content cleaner in a multi-agent deep research system.
+Your job is to extract useful research content from raw web pages and PDF documents.
 </role>
 
 <goal>
-This is denoising, NOT summarization.
-The output must contain every fact from the input. Information density goes up, information quantity stays the same.
+Remove non-content noise while preserving ALL information relevant to the research question.
+This is extraction, not summarization — keep every relevant fact, number, quote, and source reference.
 </goal>
 
 <instructions>
-Process the raw research in three steps, in this priority order:
+Remove the following types of noise:
+- Website UI elements: navigation menus, sidebars, footers, cookie notices, "related articles" lists, social media buttons, subscription prompts, advertisements
+- PDF artifacts: repeated page headers/footers, page numbers, broken symbols from formula rendering, sentence fragments from column breaks, garbled text from OCR errors
+- Boilerplate: author bios unrelated to the content, copyright notices, publication metadata blocks, "share this article" sections
 
-Step 1 — Denoise (highest priority):
-Remove everything that is not factual content:
-- The Researcher's internal reasoning ("I should search for...", "Let me check...", "Based on these results...")
-- Planning and strategy text ("Now I'll look into...", "Next step is to...")
-- Filler phrases and transitions that carry no information ("It is worth noting that...", "Interestingly...")
-Keep ALL factual claims, data points, direct quotes, technical details, source URLs, and citation references. When in doubt whether something is noise or content, keep it.
+Preserve the following:
+- All factual claims, data points, statistics, and benchmark numbers
+- Direct quotes and technical terminology
+- Source attributions, author names, and publication dates
+- Tables and structured data
+- Methodology descriptions and experimental results
+
+If the content is short (under 500 characters) or already clean, return it unchanged.
+Do not add commentary, analysis, or any text not present in the original.
+Write in the same language as the input content.
+</instructions>
+
+<output_format>
+Output the cleaned content directly — no XML tags, no preamble, no "Here is the cleaned content" prefix.
+</output_format>
+"""
+
+RESEARCHER_DENOISE_USER = """
+<research_question>
+{sub_question}
+</research_question>
+
+<raw_content>
+{tool_result}
+</raw_content>
+"""
+
+RESEARCHER_COMPRESS_SYSTEM = """
+<role>
+You are a research note editor in a multi-agent deep research system.
+Your job is to transform a Researcher's raw output into a polished research note.
+</role>
+
+<goal>
+The Researcher's output mixes factual findings with its own reasoning process.
+Extract all facts, deduplicate overlapping findings, and restructure into a clean note.
+Information density goes up, information quantity stays the same. This is editing, NOT summarization.
+</goal>
+
+<instructions>
+Process the raw research in three steps:
+
+Step 1 — Remove Researcher reasoning:
+Strip the Researcher's internal process — planning, strategy, self-assessment, transitions:
+- "I should search for...", "Let me check...", "Based on these results..."
+- "Now I'll look into...", "Next step is to..."
+- "It is worth noting that...", "Interestingly..."
+Keep ALL factual claims, data points, direct quotes, technical details, source URLs, and citation references. When in doubt, keep it.
 
 Step 2 — Deduplicate:
-When the same fact appears multiple times (common when multiple searches return overlapping results):
+When the same fact appears multiple times (common when multiple sources cover the same topic):
 - Keep the most detailed version
 - Merge citations from all versions onto the kept version
-- Do NOT drop a fact just because it is similar to another — only merge when they state the same thing
+- Do NOT drop a fact just because it is similar to another — only merge when they state the exact same thing
 
 Step 3 — Restructure:
 - Group related findings under clear thematic headers

@@ -10,7 +10,16 @@ from .prompts import (
     RESEARCHER_COMPRESS_USER, 
     RESEARCHER_RETRY_USER_PROMPT,
     RESEARCHER_MAX_STEPS_PROMPT,
+    RESEARCHER_DENOISE_SYSTEM, 
+    RESEARCHER_DENOISE_USER,
 )
+
+
+DENOISE_TOOLS = {
+    "mcp__fetch__fetch", 
+    "mcp__paper-search__read_arxiv_paper",
+    "mcp__pdfmux__convert_pdf",
+}
 
 
 class Researcher(AgentBase):
@@ -68,6 +77,10 @@ class Researcher(AgentBase):
                         try:
                             tool_result = tool.run_tool(parameters)
                             print(f"  [Researcher] 工具结果: {tool_result[:300]}...")
+
+                            if name in DENOISE_TOOLS:
+                                tool_result = self._denoise(sub_question=sub_question, raw_tool_result=tool_result)
+                                
                         except ToolCallError as e:
                             tool_result = str(e)
                             print(f"  [Researcher] 工具失败: {tool_result}")
@@ -113,3 +126,15 @@ class Researcher(AgentBase):
         )
         
         return compress_response.content
+
+    def _denoise(self, sub_question: str, raw_tool_result: str) -> str:
+        messages = [
+            {"role": "system", "content": RESEARCHER_DENOISE_SYSTEM},
+            {"role": "user", "content": RESEARCHER_DENOISE_USER.format(
+                sub_question=sub_question, tool_result=raw_tool_result
+            )}
+        ]
+        denoise_response = self.llm.invoke(
+            messages=messages
+        )
+        return denoise_response.content
