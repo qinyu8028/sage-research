@@ -1,7 +1,7 @@
 import json
 
 from sage_research.tools.base_tool import BaseTool, ToolCallError
-from ..base import AgentBase, llm_client, Message, Config
+from ..base import AgentBase, llm_client, Message
 from ..context import ContextBuilder
 from .prompts import (
     RESEARCHER_SYSTEM_PROMPT, 
@@ -24,9 +24,8 @@ class Researcher(AgentBase):
         tool_list: list[BaseTool],
         max_steps: int = 3,
         system_prompt: str = RESEARCHER_SYSTEM_PROMPT,
-        config: Config | None = None,
     ):
-        super().__init__(name, llm, context_builder, system_prompt, config)
+        super().__init__(name, llm, context_builder, system_prompt)
         self.max_steps = max_steps
         self.tool_schema = [tool.to_schema() for tool in tool_list]
         self._tool_map = {tool.name: tool for tool in tool_list}

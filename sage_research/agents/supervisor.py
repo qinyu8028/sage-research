@@ -4,7 +4,7 @@ from typing import Literal
 from openai.types.chat import ChatCompletionMessage
 from pydantic import BaseModel, Field
 
-from ..base import AgentBase, llm_client, Message, Config
+from ..base import AgentBase, llm_client, Message
 from ..context import ContextBuilder
 from .prompts import (
     SUPERVISOR_SYSTEM,
@@ -57,9 +57,8 @@ class Supervisor(AgentBase):
         context_builder: ContextBuilder,
         name: str = "supervisor",
         system_prompt: str = SUPERVISOR_SYSTEM,
-        config: Config | None = None,
     ):
-        super().__init__(name, llm, context_builder, system_prompt, config)
+        super().__init__(name, llm, context_builder, system_prompt)
 
         subquestion_schema = SubQuestion.model_json_schema()
         self.output_schema = {

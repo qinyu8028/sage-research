@@ -2,10 +2,8 @@
     "router": {
       "allowed_tools": []
     },
-    "planner": {
-      "allowed_tools": [
-        "memory_search"
-      ]
+    "supervisor": {
+      "allowed_tools": []
     },
     "researcher": {
       "allowed_tools": [

@@ -1,4 +1,4 @@
-from ..base import AgentBase, llm_client, Message, Config
+from ..base import AgentBase, llm_client, Message
 from ..context import ContextBuilder
 from .prompts import WRITER_SYSTEM_PROMPT, WRITER_USER_PROMPT
 
@@ -10,11 +10,10 @@ class Writer(AgentBase):
         self, 
         llm: llm_client, 
         context_builder: ContextBuilder, 
-        name: str = "writer", 
-        system_prompt: str = WRITER_SYSTEM_PROMPT, 
-        config: Config | None = None
+        name: str = "writer",
+        system_prompt: str = WRITER_SYSTEM_PROMPT,
     ):
-        super().__init__(name, llm, context_builder, system_prompt, config)
+        super().__init__(name, llm, context_builder, system_prompt)
 
     def run(self, research_brief: str, clean_notes: list[str]) -> str:
         """接收研究简报和已审查通过的研究笔记，单次 LLM 调用生成最终报告。"""

@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 from .message import Message
-from .config import Config
 from .llm_client import TestAgent as llm_client
 
 if TYPE_CHECKING:
@@ -23,12 +22,10 @@ class AgentBase(ABC):
         llm: llm_client,
         context_builder: ContextBuilder,
         system_prompt: str | None = None,
-        config: Config | None = None,
     ):
         self.name = name
         self.llm = llm
         self.system_prompt = system_prompt
-        self.config = config
         self.context_builder = context_builder
 
         self._history: list[Message] = []

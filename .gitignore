@@ -15,6 +15,7 @@ data/rag/*
 !data/downloads/
 data/downloads/*
 !data/downloads/.gitkeep
+logs/
 node_modules/
 tests/
 CLAUDE.md
