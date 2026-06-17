@@ -44,11 +44,11 @@ class Clarifier:
         response = self.llm.invoke(
             messages=messages,
             tools=[analyze_schema],
-            tool_choice="required",
+            tool_choice={"type": "function", "function": {"name": "analyze_query"}},
         )
 
         if not response.tool_calls:
-            print("  [Clarifier] function calling 失败，直接使用原始 query")
+            print(f"  [Clarifier] function calling 失败，直接使用原始 query")
             return raw_query
 
         args: dict = json.loads(response.tool_calls[0].function.arguments)
