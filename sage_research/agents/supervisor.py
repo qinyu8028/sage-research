@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Literal
 
 from openai.types.chat import ChatCompletionMessage
@@ -13,6 +14,8 @@ from .prompts import (
     SUPERVISOR_REVIEW_USER,
     SUPERVISOR_COVERED_SECTION,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class SubQuestion(BaseModel):
@@ -55,17 +58,19 @@ class Supervisor(AgentBase):
         self,
         llm: llm_client,
         context_builder: ContextBuilder,
+        max_steps: int,
         name: str = "supervisor",
         system_prompt: str = SUPERVISOR_SYSTEM,
     ):
         super().__init__(name, llm, context_builder, system_prompt)
+        self.max_steps = max_steps
 
         subquestion_schema = SubQuestion.model_json_schema()
         self.output_schema = {
             "type": "function",
             "function": {
                 "name": "create_research_plan",
-                "description": "Decompose the research brief into 3-5 focused, independent sub-questions for parallel research.",
+                "description": "Decompose the research brief into 3-4 focused, independent sub-questions for parallel research.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -155,7 +160,7 @@ class Supervisor(AgentBase):
         """
 
         if review_result is None:
-            prompt = SUPERVISOR_PLAN_USER.format(research_brief=research_brief)
+            prompt = SUPERVISOR_PLAN_USER.format(research_brief=research_brief, max_steps=self.max_steps)
         else:
             approved_str = "\n".join(
                 f"- {q}" for q, _ in approved_pairs
@@ -173,6 +178,7 @@ class Supervisor(AgentBase):
                 research_brief=research_brief,
                 approved_questions=approved_str,
                 revision_points=revision_str,
+                max_steps=self.max_steps,
             )
 
         brief_msg = Message(content=prompt, role="user")
@@ -183,6 +189,7 @@ class Supervisor(AgentBase):
             messages=messages,
             tool_choice="required",
             tools=[self.output_schema],
+            tag="supervisor:plan",
         )
 
         result = self._parse_tool_response(
@@ -190,7 +197,9 @@ class Supervisor(AgentBase):
         )
         self._record_response(response, result)
 
-        return [SubQuestion(**item) for item in result["sub_questions"]]
+        sub_questions = [SubQuestion(**item) for item in result["sub_questions"]]
+        logger.info("[Supervisor] plan: 生成 %d 个子问题", len(sub_questions))
+        return sub_questions
 
     def review(
         self,
@@ -233,9 +242,18 @@ class Supervisor(AgentBase):
             messages=messages,
             tool_choice="required",
             tools=[self.review_schema],
+            tag="supervisor:review",
         )
 
         result = self._parse_tool_response(response, "submit_review", wrap_key="note_reviews")
         self._record_response(response, result)
 
-        return ReviewResult(**result)
+        review_result = ReviewResult(**result)
+        for i, nr in enumerate(review_result.note_reviews):
+            if nr.verdict != "approved":
+                logger.info("[Supervisor] review[%d]: %s — %s", i, nr.verdict, nr.note_feedback)
+            else:
+                logger.info("[Supervisor] review[%d]: approved", i)
+        if review_result.missing_dimensions:
+            logger.info("[Supervisor] missing_dimensions: %s", review_result.missing_dimensions)
+        return review_result

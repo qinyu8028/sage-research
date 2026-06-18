@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import asyncio
 import threading
@@ -10,6 +11,8 @@ from pydantic import BaseModel
 from mcp.client.stdio import stdio_client, StdioServerParameters
 from mcp import ClientSession
 from ..tools import ToolCallError
+
+logger = logging.getLogger(__name__)
 
 
 class MCPServerConfig(BaseModel):
@@ -49,8 +52,10 @@ class MCPClient:
         self._ready_event.wait()
 
         if self._connect_error:
+            logger.error("[MCP] 连接失败: %s - %s", self.name, self._connect_error)
             raise self._connect_error
 
+        logger.info("[MCP] 连接: %s (%d 个工具)", self.name, len(self.tools))
         return self.tools
 
     def _run_background(self):

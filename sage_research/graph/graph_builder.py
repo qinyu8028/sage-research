@@ -1,3 +1,4 @@
+import logging
 import operator
 
 from typing import Annotated, Callable, TypedDict
@@ -7,6 +8,8 @@ from langgraph.types import Send
 from sage_research.agents.supervisor import ReviewResult, SubQuestion
 from sage_research.rag.pipeline import Pipeline
 from ..agents import Supervisor, Writer, Researcher
+
+logger = logging.getLogger(__name__)
 
 
 def pending_review_reducer(existing: list, new: list) -> list:
@@ -37,7 +40,7 @@ class OutputSchema(TypedDict):
     
 def build_graph(
     supervisor: Supervisor,
-    create_researcher: Callable[[], Researcher],
+    create_researcher: Callable[[str], Researcher],
     writer: Writer,
     pipeline: Pipeline,
     max_rounds: int = 3,
@@ -47,29 +50,37 @@ def build_graph(
     )
 
     def hand_out_subquestion(state: State) -> Send:
+        total = len(state["sub_questions"])
         return [
             Send(
-                "research_node", 
+                "research_node",
                 {
-                    "sub_question": sq.question, 
-                    "note_feedback": ""
+                    "sub_question": sq.question,
+                    "note_feedback": "",
+                    "researcher_id": f"R-{i+1}/{total}",
                 }
             )
-            for sq in state["sub_questions"]
+            for i, sq in enumerate(state["sub_questions"])
         ]
 
     def reviewer_route(state: State) -> str:
         if state["refine_round"] > max_rounds:
+            logger.info("[Graph] route: 超过最大轮数 %d, 进入 write", max_rounds)
             return "write_node"
 
         verdicts = {note_review.verdict for note_review in state["review_result"].note_reviews}
 
         if verdicts == {"approved"} and not state["review_result"].missing_dimensions:
+            logger.info("[Graph] route: 全部通过, 进入 write")
             return "write_node"
 
         if verdicts <= {"approved", "retry"} and not state["review_result"].missing_dimensions:
-            return [Send("research_node", item) for item in state["retry_items"]]
+            retry_items = state["retry_items"]
+            total = len(retry_items)
+            logger.info("[Graph] route: %d 条 retry, 重新研究", total)
+            return [Send("research_node", {**item, "researcher_id": f"Retry-{i+1}/{total}"}) for i, item in enumerate(retry_items)]
 
+        logger.info("[Graph] route: 需要 replan (verdicts=%s, missing=%s)", verdicts, bool(state["review_result"].missing_dimensions))
         return "plan_node"
 
     def plan_node(state: State) -> dict[str, SubQuestion]:
@@ -81,7 +92,7 @@ def build_graph(
         return {"sub_questions": result}
 
     def research_node(state: dict) -> dict:
-        researcher = create_researcher()
+        researcher = create_researcher(state.get("researcher_id", "R-?"))
         result = researcher.run(
             sub_question=state["sub_question"], note_feedback=state["note_feedback"]
         )
@@ -96,9 +107,9 @@ def build_graph(
         n_pairs = len(state["pending_review_pairs"])
         n_reviews = len(result.note_reviews)
         if n_reviews != n_pairs:
-            print(f"  [review_node] 警告: note_reviews({n_reviews}) != pending_pairs({n_pairs})，截断到 {min(n_reviews, n_pairs)}")
+            logger.warning("[Graph] review_node: note_reviews(%d) != pending_pairs(%d), 截断到 %d", n_reviews, n_pairs, min(n_reviews, n_pairs))
             for i, nr in enumerate(result.note_reviews):
-                print(f"    [{i}] verdict={nr.verdict}, feedback={nr.note_feedback[:100] if nr.note_feedback else ''}")
+                logger.debug("  [%d] verdict=%s, feedback=%s", i, nr.verdict, nr.note_feedback[:100] if nr.note_feedback else "")
             result.note_reviews = result.note_reviews[:n_pairs]
 
         approved_pairs = [
@@ -126,7 +137,7 @@ def build_graph(
     def write_node(state: State) -> dict:
         result = writer.run(
             research_brief=state["research_brief"],
-            clean_notes=[note for _, note in state["approved_pairs"]],
+            notes=[note for _, note in state["approved_pairs"]],
         )
         pipeline.add_text(text=result, query=state["research_brief"])
         return {"final_report": result}

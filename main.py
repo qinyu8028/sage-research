@@ -1,16 +1,20 @@
 import argparse
 import json
+import logging
 import os
 
-from sage_research.base import TestAgent
-from sage_research.context import ContextBuilder, TokenCounter, HistoryCompactor, Truncator
+from sage_research.base import TestAgent, setup_logging
+from sage_research.context import ContextBuilder, TokenCounter, HistoryCompactor
 from sage_research.graph import build_graph
 from sage_research.rag import Pipeline
 from sage_research.tools import ToolRegistry, RAGTool
+from sage_research.tools.tool_paper import PaperReaderTool
 from sage_research.mcp import create_mcp_clients, register_mcp_tools
 from sage_research.agents import Clarifier, Supervisor, Writer, Researcher
 from sage_research.search import SearchTool
 from sage_research.config import Config
+
+logger = logging.getLogger("sage_research.main")
 
 
 def parse_args():
@@ -25,6 +29,7 @@ def parse_args():
 
 
 def main():
+    setup_logging()
     args = parse_args()
     config = Config()
 
@@ -42,20 +47,14 @@ def main():
     llm = TestAgent(model=config.llm.model, timeout=config.llm.timeout)
 
     token_counter = TokenCounter()
-    truncator = Truncator(token_counter=token_counter)
     history_compactor = HistoryCompactor(
         llm_client=llm,
         token_counter=token_counter,
-        max_messages=config.compactor.max_messages,
-        keep_front_messages=config.compactor.keep_front_messages,
-        max_tool_calls=config.compactor.max_tool_calls,
-        max_tokens=config.compactor.max_tokens,
     )
     # TODO: add memory system
     context_builder = ContextBuilder(
         history_compactor=history_compactor,
         token_counter=token_counter,
-        truncator=truncator,
         max_tokens=config.context.max_tokens,
         reserve_ratio=config.context.reserve_ratio,
     )
@@ -75,6 +74,11 @@ def main():
         # self-defined tools
         registry.register_tool(RAGTool(pipeline))
 
+        download_tool = registry.tools["mcp__paper-search__download_arxiv"]
+        read_tool = registry.tools["mcp__paper-search__read_arxiv_paper"]
+        paper_reader = PaperReaderTool(download_tool, read_tool)
+        registry.register_tool(paper_reader)
+
         with open(os.path.join(config.config_dir, "agents.json")) as f:
             agent_configs = json.load(f)
         researcher_whitelist = agent_configs["researcher"]["allowed_tools"]
@@ -84,13 +88,13 @@ def main():
         clarifier = Clarifier(llm=llm)
         research_brief = clarifier.run(raw_query)
 
-        supervisor = Supervisor(llm=llm, context_builder=context_builder)
+        supervisor = Supervisor(llm=llm, context_builder=context_builder, max_steps=config.max_steps)
         writer = Writer(llm=llm, context_builder=context_builder)
 
         # make sure that every researcher's history is independent
-        def create_researcher():
+        def create_researcher(researcher_id: str = "R-?"):
             return Researcher(
-                name="researcher",
+                name=researcher_id,
                 llm=llm,
                 context_builder=context_builder,
                 tool_list=researcher_tools,
@@ -102,8 +106,14 @@ def main():
         print(result["final_report"])
 
     finally:
+        paper_reader.cleanup()
         for client in clients:
             client.disconnect()
+        total_tokens = llm.total_prompt_tokens + llm.total_completion_tokens
+        logger.info("统计: %d 次调用, tokens=%d(in:%d+out:%d)", llm.total_calls, total_tokens, llm.total_prompt_tokens, llm.total_completion_tokens)
+        print(f"\n--- 统计 ---")
+        print(f"LLM 调用: {llm.total_calls} 次")
+        print(f"Token: {total_tokens} (in:{llm.total_prompt_tokens} + out:{llm.total_completion_tokens})")
 
 
 if __name__ == "__main__":

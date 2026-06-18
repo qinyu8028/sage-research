@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 import uuid
 
@@ -17,12 +18,13 @@ from .prompts import (
 )
 
 
+logger = logging.getLogger(__name__)
+
 DENOISE_TOOLS = {
-    "mcp__fetch__fetch", 
-    "mcp__paper-search__read_arxiv_paper",
-    "mcp__pdfmux__convert_pdf",
+    "mcp__fetch__fetch",
 }
 MAX_TOOL_RESULT_CHARS = 20000
+MAX_DENOISE_RESULT_CHARS = 10000
 
 
 class Researcher(AgentBase):
@@ -43,6 +45,8 @@ class Researcher(AgentBase):
         self._tool_map = {tool.name: tool for tool in tool_list}
 
     def run(self, sub_question: str, note_feedback: str | None = None) -> str:
+        logger.info("[Researcher:%s] run: retry=%s", self.name, bool(note_feedback))
+
         if not note_feedback:
             prompt = RESEARCHER_USER_PROMPT.format(sub_question=sub_question)
         else:
@@ -52,11 +56,16 @@ class Researcher(AgentBase):
         self._history.append(user_msg)
 
         exhausted = True
+        tool_call_counts = {}
         for i in range(self.max_steps):
+            self.context_builder.compress_old_rounds(self._history, sub_question, self.system_prompt)
+            logger.info("[Researcher:%s] step %d/%d, history: %d 条消息", self.name, i + 1, self.max_steps, len(self._history))
+            
             messages = self._build_messages(self.system_prompt)
             response = self.llm.invoke(
-                messages=messages, 
-                tools=self.tool_schema
+                messages=messages,
+                tools=self.tool_schema,
+                tag=f"{self.name}:react",
             )
 
             if response.tool_calls:
@@ -70,10 +79,12 @@ class Researcher(AgentBase):
                 for tool_call in response.tool_calls:
                     name = tool_call.function.name
                     parameters = json.loads(tool_call.function.arguments)
+                    tool_call_counts[name] = tool_call_counts.get(name, 0) + 1
                     self._execute_tool(name, parameters, tool_call.id, sub_question)
 
+            # parse text
             elif parsed := self._parse_text_tool_call(response.content):
-                print(f"  [Researcher] fallback: 从文本解析到 {len(parsed)} 个工具调用")
+                logger.info("[Researcher:%s] fallback: 从文本解析到 %d 个工具调用", self.name, len(parsed))
                 fake_tool_calls = []
                 for name, parameters in parsed:
                     call_id = f"fallback_{uuid.uuid4().hex[:8]}"
@@ -91,29 +102,40 @@ class Researcher(AgentBase):
                 ))
 
                 for idx, (name, parameters) in enumerate(parsed):
+                    tool_call_counts[name] = tool_call_counts.get(name, 0) + 1
                     self._execute_tool(name, parameters, fake_tool_calls[idx]["id"], sub_question)
 
             else:
-                print(f"  [Researcher] 推理完成 ({len(response.content)} 字符)")
+                logger.info("[Researcher:%s] 推理完成, step %d (%d 字符)", self.name, i + 1, len(response.content))
                 response_msg = Message(role="assistant", content=response.content)
                 self._history.append(response_msg)
                 exhausted = False
                 break
         
         if exhausted:
+            logger.info("[Researcher:%s] max_steps 耗尽, 强制总结", self.name)
             prompt = RESEARCHER_MAX_STEPS_PROMPT
             max_iter_msg = Message(content=prompt, role="user")
             self._history.append(max_iter_msg)
 
             messages = self._build_messages(self.system_prompt)
             response = self.llm.invoke(
-                messages=messages, 
+                messages=messages,
+                tag=f"{self.name}:forced_summary",
             )
             response_msg = Message(role="assistant", content=response.content)
             self._history.append(response_msg)
-        
-        raw_research = response.content
-        result = self._compress(raw_research)
+            result = response.content
+        else:
+            result = self._compress(response.content)
+
+        steps_taken = self.max_steps if exhausted else i + 1
+        logger.info(
+            "[Researcher:%s] 完成: %d/%d 步, 工具调用: %s, history: %d 条消息, output: %d 字符%s",
+            self.name, steps_taken, self.max_steps,
+            dict(tool_call_counts), len(self._history),
+            len(result), "" if exhausted else f" (compress: {len(response.content)} -> {len(result)})",
+        )
 
         return result
 
@@ -123,35 +145,44 @@ class Researcher(AgentBase):
             {"role": "user", "content": RESEARCHER_COMPRESS_USER.format(raw_research=raw_research)}
         ]
         compress_response = self.llm.invoke(
-            messages=messages
+            messages=messages,
+            tag=f"{self.name}:compress",
         )
         
         return compress_response.content
 
     def _execute_tool(self, name: str, parameters: dict, tool_call_id: str, sub_question: str):
-        print(f"  [Researcher] 调用工具: {name}({json.dumps(parameters, ensure_ascii=False)[:200]})")
+        logger.info("[Researcher:%s] 调用工具: %s, 参数: %.200s", self.name, name, json.dumps(parameters, ensure_ascii=False))
 
         tool = self._tool_map.get(name)
         if tool is None:
             tool_result = f"Error: tool '{name}' does not exist. Available tools: {list(self._tool_map.keys())}"
-            print(f"  [Researcher] 工具不存在: {name}")
-            
+            logger.warning("[Researcher:%s] 工具不存在: %s", self.name, name)
+
         else:
             try:
                 tool_result = tool.run_tool(parameters)
-                print(f"  [Researcher] 工具结果: {tool_result[:300]}...")
-                if len(tool_result) > MAX_TOOL_RESULT_CHARS:
-                    original_length = len(tool_result)
+                raw_len = len(tool_result)
+
+                if raw_len > MAX_TOOL_RESULT_CHARS:
                     tool_result = tool_result[:MAX_TOOL_RESULT_CHARS]
-                    tool_result += f"\n\n[截断: 原始 {original_length} 字符, 保留 {MAX_TOOL_RESULT_CHARS} 字符]"
-                    print(f"  [Researcher] 工具结果过长，截断至 {MAX_TOOL_RESULT_CHARS} 字符...")
+                    tool_result += f"\n\n[截断: 原始 {raw_len} 字符, 保留 {MAX_TOOL_RESULT_CHARS} 字符]"
+                    logger.info("[Researcher:%s] 工具结果截断: %s %d -> %d 字符", self.name, name, raw_len, MAX_TOOL_RESULT_CHARS)
 
                 if name in DENOISE_TOOLS:
+                    pre_denoise_len = len(tool_result)
                     tool_result = self._denoise(sub_question=sub_question, raw_tool_result=tool_result)
+                    logger.info("[Researcher:%s] denoise: %s, %d -> %d 字符 (%.0f%%保留)", self.name, name, pre_denoise_len, len(tool_result), len(tool_result) / pre_denoise_len * 100)
+                    if len(tool_result) > MAX_DENOISE_RESULT_CHARS:
+                        original_len = len(tool_result)
+                        tool_result = tool_result[:MAX_DENOISE_RESULT_CHARS]
+                        logger.info("[Researcher:%s] denoise 结果截断: %d -> %d 字符", self.name, original_len, MAX_DENOISE_RESULT_CHARS)
+                else:
+                    logger.info("[Researcher:%s] 工具结果: %s, %d 字符", self.name, name, raw_len)
 
             except ToolCallError as e:
                 tool_result = str(e)
-                print(f"  [Researcher] 工具失败: {tool_result}")
+                logger.error("[Researcher:%s] 工具失败: %s - %s", self.name, name, tool_result)
 
         self._history.append(Message(
             role="tool", content=tool_result, tool_call_id=tool_call_id,
@@ -192,7 +223,7 @@ class Researcher(AgentBase):
         return "query"
 
     def _denoise(self, sub_question: str, raw_tool_result: str) -> str:
-        if len(raw_tool_result) < 500:
+        if len(raw_tool_result) < 2000:
             return raw_tool_result
 
         messages = [
@@ -202,6 +233,7 @@ class Researcher(AgentBase):
             )}
         ]
         denoise_response = self.llm.invoke(
-            messages=messages
+            messages=messages,
+            tag=f"{self.name}:denoise",
         )
         return denoise_response.content

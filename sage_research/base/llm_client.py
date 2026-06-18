@@ -1,9 +1,12 @@
-import os
+import os, logging, time
 from openai import OpenAI
-from openai.types.chat import ChatCompletionMessage
+from openai.types import CompletionUsage
+from openai.types.chat import ChatCompletion, ChatCompletionMessage
 from dotenv import load_dotenv
 
+
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 MODEL_PROFILES = {
     "glm": {
@@ -66,27 +69,38 @@ class TestAgent:
             api_key=self.api_key, base_url=self.base_url, timeout=self.timeout
         )
 
-    def invoke(
-        self, messages: list[dict[str, str]], temperature: float = 0, tools=None, tool_choice=None
-    ) -> ChatCompletionMessage:
-        print(f"🧠 正在调用 {self.model} 模型...")
+        self.total_prompt_tokens = 0
+        self.total_completion_tokens = 0
+        self.total_calls = 0
 
+    def invoke(
+        self, messages: list[dict[str, str]], temperature: float = 0, tools=None, tool_choice=None, max_tokens: int = 4096, tag: str = "",
+    ) -> ChatCompletionMessage:
         if tool_choice is None:
             tool_choice = "auto" if tools else None
 
-        kwargs = dict(
+        start = time.time()
+        response = self.client.chat.completions.create(
             messages=messages,
             model=self.model,
             temperature=temperature,
+            max_tokens=max_tokens,
             tool_choice=tool_choice,
             tools=tools if tools else None,
+            extra_body=self.extra_body,
         )
-        if self.extra_body:
-            kwargs["extra_body"] = self.extra_body
+        elapsed = time.time() - start
 
-        response = self.client.chat.completions.create(**kwargs)
-        
-        return response.choices[0].message
+        msg = response.choices[0].message
+        usage = response.usage
+        self.total_prompt_tokens += usage.prompt_tokens
+        self.total_completion_tokens += usage.completion_tokens
+        self.total_calls += 1
+        label = f"[LLM:{tag}]" if tag else "[LLM]"
+        logger.info("%s 响应: %.1fs, tokens=%d(in:%d+out:%d)", label, elapsed, usage.total_tokens, usage.prompt_tokens, usage.completion_tokens)
+        logger.debug("%s 输出: %.500s", label, msg.content)
+
+        return msg
 
 
 if __name__ == "__main__":

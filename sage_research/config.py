@@ -15,14 +15,6 @@ class ContextConfig:
 
 
 @dataclass
-class CompactorConfig:
-    max_messages: int = 20
-    keep_front_messages: int = 3
-    max_tool_calls: int = 3
-    max_tokens: int = 20000
-
-
-@dataclass
 class Config:
     config_dir: str = "configs"
     data_dir: str = "data"
@@ -30,4 +22,3 @@ class Config:
     max_steps: int = 3
     llm: LLMConfig = field(default_factory=LLMConfig)
     context: ContextConfig = field(default_factory=ContextConfig)
-    compactor: CompactorConfig = field(default_factory=CompactorConfig)

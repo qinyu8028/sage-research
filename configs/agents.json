@@ -11,11 +11,8 @@
         "mcp__fetch__fetch",
         "mcp__paper-search__search_arxiv",
         "mcp__paper-search__search_google_scholar",
-        "mcp__paper-search__download_arxiv",
-        "mcp__paper-search__read_arxiv_paper",
-        "mcp__pdfmux__convert_pdf",
+        "read_arxiv_paper",
         "mcp__github__search_repositories",
-        "mcp__github__get_file_contents",
         "mcp__github__search_code",
         "rag_search"
       ]

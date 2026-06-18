@@ -1,7 +1,10 @@
+import logging
 from typing import Any
 from sage_research.mcp.tool_adapter import MCPTool
 from sage_research.tools import BaseTool, ToolParameter
 from .adapter import BraveAdapter, TavilyAdapter
+
+logger = logging.getLogger(__name__)
 
 
 class SearchTool(BaseTool):
@@ -80,30 +83,30 @@ class SearchTool(BaseTool):
         try:
             result_list = self.brave_adapter.search(**kwargs)
             if result_list:
-                print(f"  [SearchTool] Brave 返回 {len(result_list)} 条结果")
+                logger.info("[SearchTool] Brave 返回 %d 条结果", len(result_list))
                 return self._format_results(result_list)
-            print(f"  [SearchTool] Brave 返回空结果，尝试 Tavily")
+            logger.info("[SearchTool] Brave 返回空结果，尝试 Tavily")
         except Exception as e:
             brave_error = True
-            print(f"  [SearchTool] Brave 异常: {e}，fallback 到 Tavily")
+            logger.warning("[SearchTool] Brave 异常: %s，fallback 到 Tavily", e)
 
         try:
             result_list = self.tavily_adapter.search(**kwargs)
             if result_list:
-                print(f"  [SearchTool] Tavily 返回 {len(result_list)} 条结果")
+                logger.info("[SearchTool] Tavily 返回 %d 条结果", len(result_list))
                 return self._format_results(result_list)
-            print(f"  [SearchTool] Tavily 返回空结果")
+            logger.info("[SearchTool] Tavily 返回空结果")
         except Exception as e:
             tavily_error = True
-            print(f"  [SearchTool] Tavily 异常: {e}")
+            logger.warning("[SearchTool] Tavily 异常: %s", e)
 
         if brave_error and tavily_error:
-            print(f"  [SearchTool] 所有搜索源不可用")
+            logger.error("[SearchTool] 所有搜索源不可用")
             return (
                 "Error: all search services are currently unavailable. "
                 "Continue working with the information you already have."
             )
-        print(f"  [SearchTool] 所有搜索源均无结果，query: {query}")
+        logger.warning("[SearchTool] 所有搜索源均无结果, query=%s", query)
         return (
             f"No results found for query '{query}'. "
             "Try rephrasing with different or broader keywords."

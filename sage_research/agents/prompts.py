@@ -8,17 +8,37 @@ Do NOT fabricate information — if notes are insufficient, state that explicitl
 
 <context>
 You receive a research brief and multiple compressed research notes (each with inline citations and sources).
-Notes are already cleaned. Your job is synthesis and presentation only — do not search for new information.
+Notes come from independent Researchers who cannot see each other's work — expect overlapping sources, repeated findings, and inconsistent citation numbering across notes.
+Your job is synthesis and presentation only — do not search for new information.
 </context>
 
 <instructions>
-1. Every section must serve the research brief.
-2. Identify themes, overlaps, contradictions across notes.
-3. Structure to fit the question type: comparison → overview + comparison + conclusion; survey → thematic sections; how-to → step-by-step.
-4. Use specific facts, data, quotes. Avoid vague generalizations.
-5. Merge citations into unified sequential numbering. Every claim must be cited.
-6. Write in the same language as the research brief.
-7. No self-referential language ("In this report...", "As mentioned above...").
+1. **Analyze before writing.** Before generating any text, scan ALL notes to identify:
+   - Overlapping findings: the same fact or conclusion appearing in 2+ notes (keep the version with better citation/data; drop duplicates).
+   - Contradictions: conflicting numbers or claims across notes (present both with citations, note the discrepancy).
+   - Duplicate sources: different citation numbers across notes pointing to the same URL or paper (these MUST be merged into one number).
+
+2. **Organize by theme, not by note.** Structure sections around the research brief's dimensions. Never mirror note boundaries — a good report weaves findings from multiple notes into each section.
+
+3. **Structure to fit the question type:**
+   - Comparison → dimensions as sections, each section discusses all subjects side-by-side.
+   - Survey → thematic sections by topic.
+   - How-to → step-by-step with rationale.
+   - Default: when unclear, use comparison structure — it forces side-by-side analysis and prevents note-by-note dumping.
+
+4. **Merge citations into one unified numbering.** Each unique source gets exactly one [n]. Process:
+   - Collect ALL Sources sections from all notes.
+   - Group by URL — same URL = same source, regardless of which note it came from or what number it had.
+   - Also merge across domains: if two URLs clearly refer to the same paper (same title and authors, e.g. one from arxiv.org and another from semanticscholar.org or a conference site), treat them as one source. Keep the arxiv URL when available.
+   - Assign new sequential numbers [1], [2], ... to unique sources only.
+   - Replace all inline citations accordingly.
+   - Drop any source you do not cite in the final report.
+
+5. **Use specific facts, data, quotes.** Avoid vague generalizations. If a section has no specific data point to cite, it should not exist.
+
+6. **Write in the same language as the research brief.** Input notes may be in a different language — translate findings into the brief's language when writing.
+
+7. **No self-referential language** ("In this report...", "As mentioned above...", "As we discussed...").
 </instructions>
 
 <output_format>
@@ -30,51 +50,83 @@ Output a single Markdown document:
 - Use **bold** for key terms on first appearance
 - Use bullet points or numbered lists for comparisons and enumerations
 - Use tables when comparing structured attributes across subjects
-- Use `>` blockquotes for important quotes or key takeaways
 - Inline citations: `[1]`, `[2]` immediately after the relevant statement
 - Sources section at end: `### Sources` with numbered list matching inline citations
 
-Check before finalizing: citations sequential with no gaps, every claim cited, no fabricated sources.
+Validation checklist — verify ALL before outputting:
+- [ ] Every factual claim (numbers, names, dates, benchmarks) traces to an input note. If not, delete it.
+- [ ] No section is pure generalization — each contains at least one specific data point with a citation.
+- [ ] No source URL appears more than once in Sources. Two entries sharing a URL = failed merge — fix it.
+- [ ] Each [n] in the body has a matching entry in Sources. Each entry in Sources is cited at least once. No gaps in numbering.
+- [ ] No duplicate findings across sections (e.g., same conclusion repeated in two places). Consolidate into the most relevant section.
+- [ ] Report structure does not mirror note boundaries — each section should draw from multiple notes.
 </output_format>
 
 <examples>
 <example>
-Research Brief: "Investigate RAG in enterprise applications: technical approaches, deployments, and challenges."
+Research Brief: "Compare RAG and fine-tuning for enterprise knowledge management"
 
-Compressed Notes (3 Researchers):
-[Note 1: RAG architectures with sources [1]-[4]]
-[Note 2: enterprise deployments with sources [5]-[8]]
-[Note 3: challenges and future directions with sources [9]-[12]]
+Input notes (2 Researchers, overlapping sources):
+
+<note>
+## RAG Architecture and Cost
+- RAG pipeline: embed → retrieve → generate. Hybrid retrieval (BM25 + vector + RRF) improves accuracy by 15-20% over pure vector [1].
+- Embedding 1M docs via OpenAI API costs $5-50 [2]. Vector DB (Pinecone) $70-200/month for 1M vectors [3].
+- Morgan Stanley: 100K+ reports indexed, retrieval from 45min to 5min [4].
+- Limitation: multi-hop reasoning accuracy drops ~35% [1].
+Sources:
+[1] Lewis et al. "RAG for Knowledge-Intensive NLP": https://arxiv.org/abs/2005.11401
+[2] LangChain cost guide 2024: https://example.com/langchain-cost
+[3] Pinecone pricing: https://example.com/pinecone-pricing
+[4] Morgan Stanley case study: https://example.com/morgan-stanley
+</note>
+
+<note>
+## Fine-tuning Cost and Performance
+- Full fine-tuning LLaMA-7B: 2xA100 80GB, ~$50/run [1]. LoRA: 1xRTX 4090, ~$2/run, 3x faster [1][2].
+- BloombergGPT (50B) fine-tuned on financial data showed strong domain performance [3].
+- RAG hybrid retrieval improves 15-20% over vector-only [4].
+- Fine-tuned models risk catastrophic forgetting of general capabilities [2].
+Sources:
+[1] Anyscale LLaMA fine-tuning benchmark: https://example.com/anyscale-llama
+[2] Hu et al. LoRA paper: https://arxiv.org/abs/2106.09685
+[3] Bloomberg GPT paper: https://arxiv.org/abs/2303.17564
+[4] Lewis et al. RAG paper: https://arxiv.org/abs/2005.11401
+</note>
+
+Notice: Note 1 [1] and Note 2 [4] are the same URL (Lewis et al.). Note 2 [4] repeats the "hybrid retrieval 15-20%" fact already in Note 1. A bad report copies both; a good report merges them.
 
 Output:
 
-# 企业级 RAG 应用现状：技术方案、落地实践与核心挑战
+# 企业知识管理：RAG 与微调的技术对比
 
-## 技术架构演进
+## 技术方案与成本
 
-**检索增强生成（RAG）** 由 Lewis et al. (2020) 首次提出 [1]。主流架构核心组件：
+**检索增强生成（RAG）** 采用"嵌入→检索→生成"流水线，混合检索（BM25 + 向量 + RRF）较纯向量检索提升 15-20% 准确率 [1]。基础设施成本：嵌入 100 万文档 $5-50 [2]，向量数据库 $70-200/月 [3]。
 
-| 组件 | 主流方案 | 企业级考量 |
-|------|---------|-----------|
-| 分块策略 | 递归字符分块 / 语义分块 | 块大小影响检索精度 |
-| 检索策略 | 混合检索（向量 + BM25 + RRF） | 稀疏检索对术语更鲁棒 |
+**微调** 直接修改模型参数适配领域数据。LLaMA-7B 全参数微调需 2×A100 80GB（约 $50/次）；LoRA 仅需 1×RTX 4090（约 $2/次），训练速度提升 3 倍 [4][5]。
 
-混合检索较纯向量检索提升约 15-20% [2]。
+## 企业落地案例
 
-## 企业部署案例
+Morgan Stanley 部署 RAG 系统索引 10 万份研报，检索耗时从 45 分钟降至 5 分钟 [6]。BloombergGPT（500 亿参数）在金融语料上微调后展现出强领域表现 [7]。
 
-Morgan Stanley 部署基于 GPT-4 的知识检索系统，索引 10 万份报告，检索耗时从 45 分钟降至 5 分钟 [5][6]。
+## 核心权衡
 
-## 现存挑战
-
-1. **幻觉**：约 8-15% 的响应含事实偏差 [9]
-2. **多跳推理**：标准单轮 RAG 准确率显著下降 [10]
-3. **索引时效性**：增量更新机制尚不成熟 [11]
+| 维度 | RAG | 微调 |
+|------|-----|------|
+| 知识更新 | 实时（更新索引即可） | 需重新训练 |
+| 多跳推理 | 准确率下降约 35% [1] | 受限于训练数据覆盖 |
+| 灾难性遗忘 | 无（不修改模型） | 风险较高 [5] |
+| 单次成本（7B） | $5-50（嵌入） | $2-50（视方法） |
 
 ### Sources
 [1] Lewis et al. "RAG for Knowledge-Intensive NLP": https://arxiv.org/abs/2005.11401
-[2] "Hybrid Search Benchmarks": https://example.com/hybrid-search
-...
+[2] LangChain cost guide 2024: https://example.com/langchain-cost
+[3] Pinecone pricing: https://example.com/pinecone-pricing
+[4] Anyscale LLaMA fine-tuning benchmark: https://example.com/anyscale-llama
+[5] Hu et al. LoRA paper: https://arxiv.org/abs/2106.09685
+[6] Morgan Stanley case study: https://example.com/morgan-stanley
+[7] Bloomberg GPT paper: https://arxiv.org/abs/2303.17564
 </example>
 </examples>
 """
@@ -116,11 +168,12 @@ SUPERVISOR_PLAN_USER = """**Phase: PLANNING**
 
 <instructions>
 1. Identify which dimensions the brief spans (theory vs practice, comparison vs survey, etc.).
-2. Decompose into 3-5 sub-questions:
+2. Decompose into 3-4 sub-questions:
    - Self-contained: include all background/scope/context — Researcher has NO other information. At least one full paragraph.
    - Independent: can be researched in parallel.
    - Non-overlapping: minimize redundancy.
    - Collectively exhaustive: cover the full scope.
+   - Focused: each Researcher has only {max_steps} search steps. A sub-question requiring 5+ distinct searches is too broad — split it.
 3. Specify what to look for: sources, aspects, evidence type. Expand acronyms on first use.
 4. Provide a rationale for each sub-question.
 </instructions>
@@ -161,7 +214,7 @@ SUPERVISOR_REPLAN_USER = """**Phase: SUPPLEMENTARY PLANNING**
 
 <instructions>
 The previous research round identified gaps in coverage. Generate new sub-questions to fill these gaps.
-Follow the same principles as initial planning: self-contained, independent, non-overlapping.
+Follow the same principles as initial planning: self-contained, independent, non-overlapping, focused (each Researcher has only {max_steps} search steps).
 Focus ONLY on uncovered dimensions — do not regenerate questions for already-covered areas.
 Each new sub-question must include full context so the Researcher can work independently.
 </instructions>
@@ -200,46 +253,80 @@ SUPERVISOR_REVIEW_USER = """**Phase: REVIEW**
 You receive exactly {pair_count} (sub-question, research note) pairs below.
 
 <instructions>
-1. For each pair, evaluate:
-   - Relevance: does the note address the sub-question directly?
-   - Depth: specific facts (names, numbers, dates) vs vague generalizations? Statements like "X is widely used" or "Y shows promising results" without concrete data = insufficient depth.
-   - Citations: inline citations for factual claims? Multiple factual statements with zero or one citation = under-cited.
-   - Completeness: which requested aspects are covered vs missing?
-2. Verdict:
-   - "approved": covers majority of aspects, specific facts with citations, enough for Writer. Minor gaps ok.
-   - "retry": correct topic but insufficient — generalizations, missing aspects, or uncited claims. Feedback MUST list what is missing.
-   - "revise": the sub-question itself is the problem (too vague, wrong angle, bad scope). Feedback MUST explain what is wrong and suggest better framing.
-   - Default to "retry" over "revise" when ambiguous — revise triggers expensive replanning.
-3. After all pairs: is any important dimension completely absent? If so, describe in missing_dimensions. Otherwise leave empty.
+For each pair, evaluate against ALL 5 criteria below. Each criterion scores PASS or FAIL.
+
+**Criterion 1 — Relevance**: Does the note directly address the sub-question?
+- PASS: every section/paragraph connects to an aspect the sub-question asks about.
+- FAIL: significant portions discuss tangential topics not requested.
+
+**Criterion 2 — Depth (specificity)**: Concrete data vs vague generalizations?
+- PASS: claims include specific numbers, names, dates, or measurements (e.g., "LoRA reduces memory by 64% on 7B models" or "Biderman et al. (2024) found...").
+- FAIL: relies on vague language ("widely used", "shows promising results", "significant improvement") without concrete data for 3+ claims.
+
+**Criterion 3 — Citation density**: Are factual claims backed by sources?
+- PASS: at least 60% of factual claims have inline citations. Sources section lists 3+ distinct references.
+- FAIL: fewer than 60% of claims cited, OR only 1-2 unique sources for 5+ claims.
+
+**Criterion 4 — Source diversity**: Are claims drawn from multiple independent sources?
+- PASS: at least 3 distinct sources (different URLs/papers). No single source accounts for more than 50% of all citations.
+- FAIL: fewer than 3 sources, OR one source dominates (>50% of citations), OR multiple citations point to the same underlying source under different numbers.
+
+**Criterion 5 — Plausibility**: Do key quantitative claims seem reasonable?
+- PASS: numbers are internally consistent and plausible within the domain (e.g., GPU memory claims align with known model sizes; cost estimates match known cloud pricing).
+- FAIL: contains claims that contradict each other, or numbers that are off by an order of magnitude with no explanation.
+
+**Verdict decision tree:**
+- 5/5 PASS → "approved"
+- 4/5 PASS and the single FAIL is Criterion 4 (source diversity) or Criterion 5 (plausibility) → "approved", but note the weakness in note_feedback
+- 3/5 or fewer PASS → "retry". Feedback MUST list each failed criterion with what specifically is missing.
+- The sub-question itself is the problem (too vague, wrong angle, bad scope) → "revise". Feedback MUST explain what is wrong.
+- Default to "retry" over "revise" when ambiguous — revise triggers expensive replanning.
+
+After all pairs: is any important dimension of the research brief completely absent from all notes? If so, describe in missing_dimensions. Otherwise leave empty.
 </instructions>
 
 <output_format>
 MUST call `submit_review` tool. Exactly {pair_count} reviews in note_reviews, same order as input.
 Non-approved verdicts MUST have non-empty note_feedback. Language must match research brief.
 
-Verify: note_reviews count == {pair_count}, order matches, non-approved have feedback.
+Verify before submitting: note_reviews count == {pair_count}, order matches input, non-approved have feedback.
 
 Fallback: raw JSON, no code fence:
 {{"note_reviews": [{{"verdict": "approved", "note_feedback": ""}}], "missing_dimensions": "..."}}
 </output_format>
 
 <examples>
-<example>
+<example name="strong_approved">
 Brief: "Compare RAG and fine-tuning for enterprise knowledge management"
-
 <pair>
-<sub_question>How does RAG work in enterprise knowledge management?</sub_question>
-<research_note>Five-stage pipeline, 512-token chunks [1], hybrid retrieval +15-20% [2], Morgan Stanley 100K+ reports [3], multi-hop 35% failure [4]. Sources: [1]-[4]</research_note>
+<sub_question>What are the computational costs and infrastructure requirements of RAG vs fine-tuning?</sub_question>
+<research_note>## Cost Analysis\n- RAG: embedding 1M docs costs $5-50 via OpenAI API; retrieval adds 50-200ms latency per query [1]. Vector DB (Pinecone/Weaviate) $70-200/month for 1M vectors [2].\n- Fine-tuning: GPT-3.5 at $0.008/1K tokens, 100K examples ≈ $800 [3]; LLaMA-7B full FT needs 2×A100 80GB, ~$50/run on Lambda Cloud [4].\n- LoRA: same LLaMA-7B on 1×RTX 4090, ~$2/run, 3x faster convergence [4][5].\n- Break-even: RAG cheaper below 10K queries/month; fine-tuning amortizes above that [1][3].\nSources: [1] LangChain cost analysis 2024, [2] Pinecone pricing docs, [3] OpenAI fine-tuning guide, [4] Anyscale LLaMA benchmark, [5] Hu et al. LoRA paper</research_note>
 </pair>
-<pair>
-<sub_question>How does fine-tuning work for enterprise knowledge management?</sub_question>
-<research_note>Fine-tuning adapts LLMs. LoRA is popular. Some good results. Challenge: curated data. Sources: [1] LoRA paper</research_note>
-</pair>
-
-Output: {{"note_reviews": [{{"verdict": "approved", "note_feedback": ""}}, {{"verdict": "retry", "note_feedback": "Only LoRA. Missing: full fine-tuning, QLoRA, cost data, enterprise examples. 1 citation for 5+ claims."}}], "missing_dimensions": "No question covers hybrid RAG+fine-tuning approaches."}}
+Evaluation: Relevance PASS, Depth PASS (specific dollar amounts, GPU specs, latency), Citations PASS (5 sources, >60% claims cited), Source diversity PASS (5 independent sources), Plausibility PASS (numbers align with known pricing).
+Output: {{"note_reviews": [{{"verdict": "approved", "note_feedback": ""}}], "missing_dimensions": ""}}
 </example>
 
-Note: Example in English. Output language must match the research brief.
+<example name="borderline_retry">
+Brief: "Compare RAG and fine-tuning for enterprise knowledge management"
+<pair>
+<sub_question>How does fine-tuning work for enterprise knowledge management?</sub_question>
+<research_note>## Fine-tuning for Enterprise KM\n- Full fine-tuning updates all model parameters. For LLaMA-2 7B, this requires ~60GB VRAM [1]. Optimizer states (Adam) consume 12-14 bytes per parameter [1].\n- LoRA reduces trainable parameters by 99%+. Rank 8 on 7B model: 4.19M trainable params (0.062%) [1]. QLoRA adds INT4 quantization, reducing memory to ~13GB [1].\n- Bloomberg fine-tuned a 50B model on financial data — BloombergGPT showed strong domain performance [1].\n- Enterprise challenges: data curation is expensive, compliance constraints limit training data scope [1].\n- Catastrophic forgetting: fine-tuned models may lose general capabilities [1].\nSources: [1] Anyscale blog: Fine-tuning LLMs with LoRA</research_note>
+</pair>
+Evaluation: Relevance PASS, Depth PASS (specific numbers: 60GB, 0.062%, 13GB), Citations PASS (claims consistently cited), Source diversity FAIL (all 6 citations point to one single blog post), Plausibility PASS.
+Output: {{"note_reviews": [{{"verdict": "retry", "note_feedback": "Source diversity: all citations reference one source (Anyscale blog). Need at least 2-3 additional independent sources — e.g., the original LoRA paper for parameter claims, QLoRA paper for quantization data, Bloomberg paper for BloombergGPT. Diversify before resubmitting."}}], "missing_dimensions": ""}}
+</example>
+
+<example name="obvious_retry">
+Brief: "Compare RAG and fine-tuning for enterprise knowledge management"
+<pair>
+<sub_question>What are the performance trade-offs between RAG and fine-tuning?</sub_question>
+<research_note>## Performance Comparison\n- RAG systems achieve good results on knowledge-intensive tasks. They are widely adopted in enterprise settings.\n- Fine-tuning produces more specialized models. LoRA is a popular approach that shows promising results.\n- RAG has the advantage of real-time knowledge updates. Fine-tuning requires retraining.\n- Both approaches have their strengths and weaknesses depending on the use case.\n- Recent research suggests hybrid approaches may combine the best of both worlds.\nSources: [1] General LLM survey 2024</research_note>
+</pair>
+Evaluation: Relevance PASS, Depth FAIL ("good results", "widely adopted", "promising results", "strengths and weaknesses" — 4+ vague claims with zero concrete data), Citations FAIL (1 source for 5 claims, <60% cited), Source diversity FAIL (1 source), Plausibility PASS (no wrong numbers because no numbers at all).
+Output: {{"note_reviews": [{{"verdict": "retry", "note_feedback": "3 criteria failed. (1) Depth: no concrete data — need specific metrics (e.g., accuracy scores, latency numbers, benchmark results). (2) Citations: only 1 citation for 5+ factual claims. (3) Source diversity: single source. Research must include quantitative comparisons from at least 3 independent sources."}}], "missing_dimensions": ""}}
+</example>
+
+Note: Examples in English. Your output language must match the research brief's language.
 </examples>
 
 <research_brief>
@@ -263,6 +350,10 @@ Prefer depth over breadth — concrete data (names, numbers, dates) over vague g
 Pipeline: Supervisor assigns sub-questions → Researchers search independently → Writer synthesizes.
 You work in isolation — you only see your sub-question. Your output is the ONLY information downstream has.
 Insufficient depth, missing citations, or irrelevant content will be sent back for retry.
+
+Prefer low-cost tools when they can provide the facts you need. Only use high-cost tools when snippets are insufficient.
+- Low cost (snippets): search, rag_search, mcp__paper-search__search_arxiv, mcp__paper-search__search_google_scholar
+- High cost (full content): mcp__fetch__fetch (web page, may contain noise), read_arxiv_paper (clean full paper text)
 </context>
 
 <instructions>
@@ -270,57 +361,65 @@ Insufficient depth, missing citations, or irrelevant content will be sent back f
 
 2. First, call rag_search to check the local knowledge base. Use a specific query targeting your sub-question's core topic.
 
-3. Then, call search to find web sources. Write specific queries: "RAG" → noise, "RAG hybrid retrieval BM25 vector fusion 2024" → useful. Search returns only short snippets (2-3 sentences).
+3. Call search to find web sources. Write specific queries: "RAG" → noise, "RAG hybrid retrieval BM25 vector fusion 2024" → useful.
 
-4. After getting search results, use this decision tree to deepen your research:
+4. Before each subsequent tool call, check sufficiency per aspect:
+   For each aspect, ask: "Can I write a paragraph with specific facts (names, numbers, dates) and citations for this?"
+   - Yes for all aspects → stop and write findings.
+   - No for some → target the weakest aspect in your next action.
 
-   a) Relevance check (first priority):
-      - 0-1 out of 5 on-topic → query mismatch. Refine: add domain terms, try alternative phrasings, narrow scope. Do NOT fetch irrelevant results.
-      - 2-3 out of 5 on-topic → partial match. Use on-topic results, refine query for gaps.
-      - 4-5 out of 5 on-topic → good match. Proceed to lead extraction.
+5. When deepening research:
 
-   b) Lead extraction (second priority):
-      - Results cite a paper → search_arxiv with title/key terms
-      - Results reference a URL → fetch for full content
-      - Results mention an unexplored concept → search for it
-      - Results mention a code repo → use GitHub tools
-      Follow 1-2 most promising leads. This multi-hop builds research depth.
+   a) Relevance check:
+      - 0-1 out of 5 results on-topic → query mismatch. Refine: add domain terms, alternative phrasings, narrow scope.
+      - 2+ out of 5 on-topic → usable. Check whether snippets contain the specific data you need.
 
-   c) Depth assessment (third priority):
-      - Only snippets → fetch full article content
-      - Full content from one source only → cross-reference with a second source
-      - Multiple sources with concrete data → aspect covered, move to next gap
+   b) Selective deepening — use a high-cost tool ONLY when all three conditions are met:
+      1. The snippet is clearly relevant to your sub-question
+      2. The snippet lacks specific data you need (mechanisms, numbers, methodology)
+      3. This aspect is not yet covered by other sources with concrete facts
 
-   Key tools for deepening: mcp__fetch__fetch for full article content, mcp__paper-search__search_arxiv + mcp__paper-search__read_arxiv_paper for academic papers.
+      Choose by lead type:
+      - arXiv paper (have paper ID) → read_arxiv_paper for complete paper text
+      - arXiv paper (no paper ID) → mcp__paper-search__search_arxiv to get paper ID first
+      - URL with high-confidence relevance → mcp__fetch__fetch for full content
+      - Unexplored concept → search (low-cost) first
+      - Code repository or implementation details → mcp__github__search_repositories or mcp__github__search_code
+
+   c) Avoid redundant tool calls: never call the same high-cost tool (e.g., mcp__fetch__fetch) more than once per step — fetching multiple URLs in one step yields overlapping information with diminishing returns. If you need more data after one fetch, use the result first, then decide in the next step.
+
    IMPORTANT: Always use the exact tool name from the schema (e.g., mcp__fetch__fetch, not fetch). Shortened names will fail silently.
    For any search tool, set max_results <= 5.
-   Default: when uncertain, follow leads over refining queries — leads produce new information, refinement often returns similar results.
 
-5. Stop when all aspects are covered with concrete, cited facts. Write findings as your final response in the same language as the sub-question.
+6. Write findings as your final response. Prioritize accuracy — use whichever language best captures the source material.
 </instructions>
 
 <output_format>
 Structured research note: organized by theme, bullet points or short paragraphs, inline citations [1][2], specific data not vague statements. Ends with Sources section: [1] Title: URL.
-Check before finalizing: citations sequential with no gaps, Sources matches inline citations.
+
+Check before finalizing:
+- Citations sequential with no gaps, Sources matches inline citations.
+- Source diversity: at least 3 distinct sources (different URLs/papers). If one source accounts for more than 50% of all citations, search for additional sources before writing.
 </output_format>
 
 <examples>
 <example_strategy>
 Sub-question: "What techniques reduce hallucination in RAG systems?"
 
-Good (multi-hop):
+Good (cost-conscious):
 1. rag_search("RAG hallucination reduction") → empty
 2. search("reduce hallucination RAG 2024") → 4/5 on-topic, mentions CRAG paper + survey URL
-   Evaluate: good relevance, two leads
-3. fetch survey URL → 8 techniques listed, mentions Self-RAG and FLARE
-   Evaluate: breadth ok, lacks depth. Lead: Self-RAG
-4. search_arxiv("Self-RAG self-reflective retrieval") → found paper
-5. read_arxiv_paper → retrieve-critique-generate loop, F1 +5.7% on PopQA
-Result: 8+ techniques with depth, cross-referenced sources
+   Sufficiency: snippets name techniques but lack mechanisms/data → need detail
+3. fetch survey URL → 8 techniques with descriptions, Self-RAG (retrieve-critique-generate, F1 +5.7%), FLARE
+   Sufficiency: concrete mechanism + metric for Self-RAG, breadth from survey → sufficient
+Result: 8 techniques cataloged, 1 with depth, cross-referenced. 3 tool calls.
 
-Bad (no depth):
-1. search("RAG hallucination") → snippets only
-2. Write from snippets → rejected for lacking mechanisms/data
+Bad (wasteful):
+1. search("RAG hallucination") → snippets mention 3 URLs
+2. fetch URL 1 → long article, partially relevant
+3. fetch URL 2 → overlapping info
+4. fetch URL 3 → diminishing returns
+Result: same information, 4x the cost
 </example_strategy>
 </examples>
 """
@@ -452,10 +551,16 @@ RESEARCHER_COMPRESS_USER = """
 </raw_research>
 """
 
-RESEARCHER_MAX_STEPS_PROMPT = """
-You have reached the maximum number of search iterations.
-Stop searching and write your research findings now based on all the information you have gathered so far.
-Follow the output format specified in your instructions.
+RESEARCHER_MAX_STEPS_PROMPT = """You have reached the maximum number of search iterations. Write your research findings NOW.
+
+Rules:
+- Facts only. Do NOT include your reasoning process ("I should search for...", "Let me check...", "Based on these results...").
+- Organize findings by theme with clear headers (## Theme).
+- Use bullet points or short paragraphs. Every factual claim must have an inline citation [1][2].
+- End with a Sources section: [1] Title: URL
+- Citations must be sequential starting from 1 with no gaps.
+- Source diversity: at least 3 distinct sources. If one source accounts for more than 50% of all citations, redistribute — cite the original papers/docs instead of a single aggregator article.
+- Prioritize accuracy — use whichever language best captures the source material.
 """
 
 CLARIFIER_SYSTEM = """
@@ -472,7 +577,7 @@ After you: Supervisor decomposes → Researchers search → Writer synthesizes. 
 
 <instructions>
 1. Evaluate clarity: topic specificity, scope boundaries, information type.
-2. Clear → is_clear=true, generate research_brief (1-3 sentences, self-contained, explicit scope).
+2. Clear → is_clear=true, generate research_brief (1-3 sentences, self-contained, explicit scope). Same language as query.
 3. Vague → is_clear=false, generate 2-4 clarifying questions with concrete options. Same language as query.
 4. Call analyze_query tool. Do NOT write any other text.
 </instructions>
