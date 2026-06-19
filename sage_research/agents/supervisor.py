@@ -19,28 +19,25 @@ logger = logging.getLogger(__name__)
 
 
 class SubQuestion(BaseModel):
-    question: str = Field(
-        description="A detailed, self-contained research sub-question with full context. "
-        "Must be specific enough for an independent Researcher to work on without any other information. "
-        "At least one full paragraph."
-    )
-    rationale: str = Field(
-        description="Why this sub-question deserves separate investigation and what unique dimension it covers."
-    )
+    question: str = Field(description="The research sub-question.")
+    rationale: str = Field(description="Why this sub-question deserves separate investigation.")
 
 
 class NoteReview(BaseModel):
+    relevance: str = Field(default="", description="Evidence for relevance criterion.")
+    depth: str = Field(default="", description="Evidence for depth criterion.")
+    citations: str = Field(default="", description="Evidence for citation density criterion.")
+    sources: str = Field(default="", description="Evidence for source diversity criterion.")
     verdict: Literal["approved", "retry", "revise"] = Field(
-        description="approved: research is sufficient. "
-        "retry: right topic but needs more depth or sources, send back to Researcher. "
-        "revise: the sub-question itself is flawed, needs supplementary planning."
+        description="Derived from evidence using the decision tree in instructions."
     )
-    note_feedback: str = Field(
-        default="",
-        description="For retry: list exactly what is missing or needs sources. "
-        "For revise: explain what is wrong with the sub-question. "
-        "Empty for approved.",
-    )
+
+    def failed_criteria(self) -> str:
+        if self.verdict == "approved":
+            return ""
+        fields = {"relevance": self.relevance, "depth": self.depth,
+                  "citations": self.citations, "sources": self.sources}
+        return "\n".join(f"{k}: {v}" for k, v in fields.items() if v)
 
 
 class ReviewResult(BaseModel):
@@ -70,7 +67,7 @@ class Supervisor(AgentBase):
             "type": "function",
             "function": {
                 "name": "create_research_plan",
-                "description": "Decompose the research brief into 3-4 focused, independent sub-questions for parallel research.",
+                "description": "Submit the research sub-questions.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -93,7 +90,7 @@ class Supervisor(AgentBase):
                         "note_reviews": {"type": "array", "items": note_review_schema},
                         "missing_dimensions": {
                             "type": "string",
-                            "description": "Dimensions of the research brief not covered by any existing sub-question. Empty string if coverage is adequate.",
+                            "description": "Uncovered dimensions of the research brief, or empty string.",
                         },
                     },
                     "required": ["note_reviews"],
@@ -166,10 +163,12 @@ class Supervisor(AgentBase):
                 f"- {q}" for q, _ in approved_pairs
             ) if approved_pairs else ""
 
-            revision_points = [
-                nr.note_feedback for nr in review_result.note_reviews
-                if nr.verdict == "revise" and nr.note_feedback
-            ]
+            revision_points = []
+            for nr in review_result.note_reviews:
+                if nr.verdict == "revise":
+                    feedback = nr.failed_criteria()
+                    if feedback:
+                        revision_points.append(feedback)
             if review_result.missing_dimensions:
                 revision_points.append(review_result.missing_dimensions)
             revision_str = "\n".join(f"- {rp}" for rp in revision_points)
@@ -250,10 +249,11 @@ class Supervisor(AgentBase):
 
         review_result = ReviewResult(**result)
         for i, nr in enumerate(review_result.note_reviews):
-            if nr.verdict != "approved":
-                logger.info("[Supervisor] review[%d]: %s — %s", i, nr.verdict, nr.note_feedback)
+            failed = nr.failed_criteria()
+            if failed:
+                logger.info("[Supervisor] review[%d]: %s | %s", i, nr.verdict, failed.replace("\n", ", "))
             else:
-                logger.info("[Supervisor] review[%d]: approved", i)
+                logger.info("[Supervisor] review[%d]: %s (4/4 PASS)", i, nr.verdict)
         if review_result.missing_dimensions:
             logger.info("[Supervisor] missing_dimensions: %s", review_result.missing_dimensions)
         return review_result

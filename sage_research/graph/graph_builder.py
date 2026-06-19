@@ -109,7 +109,7 @@ def build_graph(
         if n_reviews != n_pairs:
             logger.warning("[Graph] review_node: note_reviews(%d) != pending_pairs(%d), 截断到 %d", n_reviews, n_pairs, min(n_reviews, n_pairs))
             for i, nr in enumerate(result.note_reviews):
-                logger.debug("  [%d] verdict=%s, feedback=%s", i, nr.verdict, nr.note_feedback[:100] if nr.note_feedback else "")
+                logger.debug("  [%d] verdict=%s, failed=%s", i, nr.verdict, nr.failed_criteria()[:100])
             result.note_reviews = result.note_reviews[:n_pairs]
 
         approved_pairs = [
@@ -120,7 +120,7 @@ def build_graph(
         retry_items = [
             {
                 "sub_question": state["pending_review_pairs"][i][0],
-                "note_feedback": note_review.note_feedback
+                "note_feedback": note_review.failed_criteria(),
             }
             for i, note_review in enumerate(result.note_reviews)
             if note_review.verdict == "retry"

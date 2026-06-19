@@ -12,14 +12,13 @@ from ..mcp.tool_adapter import MCPTool
 
 
 TimeRange = Literal["day", "week", "month", "year"]
-RELATIVE_KEYWORDS = {"day", "week", "month", "year"}
 
 
 def _parse_time_filter(
     time_filter: str,
 ) -> tuple[TimeRange | None, tuple[str, str] | None]:
     value = time_filter.strip()
-    if value in RELATIVE_KEYWORDS:
+    if value in {"day", "week", "month", "year"}:
         return value, None
     if "to" in value:
         parts = value.split("to", 1)

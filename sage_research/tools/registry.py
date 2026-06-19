@@ -1,5 +1,8 @@
+import logging
 from typing import Any
 from .base_tool import BaseTool
+
+logger = logging.getLogger(__name__)
 
 
 class ToolRegistry:
@@ -10,7 +13,7 @@ class ToolRegistry:
 
     def register_tool(self, tool: BaseTool):
         if tool.name in self.tools:
-            print(f"⚠️ 警告:工具 '{tool.name}' 已存在，将被覆盖。")
+            logger.warning("工具 '%s' 已存在，将被覆盖", tool.name)
         self.tools[tool.name] = tool
 
     def get_tools(self, whitelist: list[str]) -> list[BaseTool]:

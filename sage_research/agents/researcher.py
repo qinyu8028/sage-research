@@ -20,9 +20,6 @@ from .prompts import (
 
 logger = logging.getLogger(__name__)
 
-DENOISE_TOOLS = {
-    "mcp__fetch__fetch",
-}
 MAX_TOOL_RESULT_CHARS = 20000
 MAX_DENOISE_RESULT_CHARS = 10000
 
@@ -169,7 +166,7 @@ class Researcher(AgentBase):
                     tool_result += f"\n\n[截断: 原始 {raw_len} 字符, 保留 {MAX_TOOL_RESULT_CHARS} 字符]"
                     logger.info("[Researcher:%s] 工具结果截断: %s %d -> %d 字符", self.name, name, raw_len, MAX_TOOL_RESULT_CHARS)
 
-                if name in DENOISE_TOOLS:
+                if name in {"mcp__fetch__fetch"}:
                     pre_denoise_len = len(tool_result)
                     tool_result = self._denoise(sub_question=sub_question, raw_tool_result=tool_result)
                     logger.info("[Researcher:%s] denoise: %s, %d -> %d 字符 (%.0f%%保留)", self.name, name, pre_denoise_len, len(tool_result), len(tool_result) / pre_denoise_len * 100)

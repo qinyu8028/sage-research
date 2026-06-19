@@ -13,8 +13,10 @@ from sage_research.mcp import create_mcp_clients, register_mcp_tools
 from sage_research.agents import Clarifier, Supervisor, Writer, Researcher
 from sage_research.search import SearchTool
 from sage_research.config import Config
+from sage_research.display import stream_graph
 
 logger = logging.getLogger("sage_research.main")
+display = logging.getLogger("sage_research.display")
 
 
 def parse_args():
@@ -102,8 +104,12 @@ def main():
             )
 
         graph = build_graph(supervisor, create_researcher, writer, pipeline, config.max_rounds)
-        result = graph.invoke({"research_brief": research_brief})
-        print(result["final_report"])
+
+        display.info("\n" + "=" * 60)
+        display.info("开始研究: %s", research_brief)
+        display.info("=" * 60)
+
+        stream_graph(graph, {"research_brief": research_brief})
 
     finally:
         paper_reader.cleanup()
@@ -111,9 +117,9 @@ def main():
             client.disconnect()
         total_tokens = llm.total_prompt_tokens + llm.total_completion_tokens
         logger.info("统计: %d 次调用, tokens=%d(in:%d+out:%d)", llm.total_calls, total_tokens, llm.total_prompt_tokens, llm.total_completion_tokens)
-        print(f"\n--- 统计 ---")
-        print(f"LLM 调用: {llm.total_calls} 次")
-        print(f"Token: {total_tokens} (in:{llm.total_prompt_tokens} + out:{llm.total_completion_tokens})")
+        display.info("\n--- 统计 ---")
+        display.info("LLM 调用: %d 次", llm.total_calls)
+        display.info("Token: %d (in:%d + out:%d)", total_tokens, llm.total_prompt_tokens, llm.total_completion_tokens)
 
 
 if __name__ == "__main__":

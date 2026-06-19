@@ -1,6 +1,9 @@
+import logging
 import os
 from openai import OpenAI
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -27,19 +30,24 @@ class Embedding:
             api_key=self.api_key, base_url=self.base_url, timeout=self.timeout
         )
 
+    MAX_BATCH_SIZE = 64
+
     def invoke(self, input_text: list[str] | str) -> tuple[list[float], int]:
         is_single = isinstance(input_text, str)
         if is_single:
             input_text = [input_text]
 
-        print(f"🧠 正在调用 {self.model} 向量模型...")
+        logger.info("调用 %s 向量模型, %d 条输入", self.model, len(input_text))
 
-        response = self.client.embeddings.create(
-            model=self.model,
-            input=input_text,
-        )
+        all_embeddings = []
+        total_tokens = 0
+        for i in range(0, len(input_text), self.MAX_BATCH_SIZE):
+            batch = input_text[i : i + self.MAX_BATCH_SIZE]
+            response = self.client.embeddings.create(
+                model=self.model,
+                input=batch,
+            )
+            total_tokens += response.usage.total_tokens
+            all_embeddings.extend(item.embedding for item in response.data)
 
-        total_tokens = response.usage.total_tokens
-        embeddings = [item.embedding for item in response.data]
-
-        return (embeddings[0] if is_single else embeddings, total_tokens)
+        return (all_embeddings[0] if is_single else all_embeddings, total_tokens)
