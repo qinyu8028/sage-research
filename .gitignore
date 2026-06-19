@@ -16,6 +16,8 @@ data/rag/*
 data/downloads/*
 !data/downloads/.gitkeep
 logs/
+sage_research/memory/
+sage_research/tools/tool_memory.py
 node_modules/
 tests/
 CLAUDE.md
