@@ -253,46 +253,48 @@ SUPERVISOR_REVIEW_USER = """**Phase: REVIEW**
 You receive exactly {pair_count} (sub-question, research note) pairs below.
 
 <instructions>
-For each pair, evaluate against ALL 5 criteria below. Each criterion scores PASS or FAIL.
+For each pair, extract evidence for 4 criteria, then derive verdict.
 
-**Criterion 1 — Relevance**: Does the note directly address the sub-question?
-- PASS: every section/paragraph connects to an aspect the sub-question asks about.
-- FAIL: significant portions discuss tangential topics not requested.
+**Criterion 1 — relevance**: List which sections of the note match vs. do not match the sub-question.
 
-**Criterion 2 — Depth (specificity)**: Concrete data vs vague generalizations?
-- PASS: claims include specific numbers, names, dates, or measurements (e.g., "LoRA reduces memory by 64% on 7B models" or "Biderman et al. (2024) found...").
-- FAIL: relies on vague language ("widely used", "shows promising results", "significant improvement") without concrete data for 3+ claims.
+**Criterion 2 — depth**: Quote specific data points found (numbers, names, dates). Then quote vague phrases if any ("widely used", "promising results", etc.).
+Format: "N specific data points: [list them]. M vague claims: [quote them]."
+Rule: if M >= 3, this criterion fails.
 
-**Criterion 3 — Citation density**: Are factual claims backed by sources?
-- PASS: at least 60% of factual claims have inline citations. Sources section lists 3+ distinct references.
-- FAIL: fewer than 60% of claims cited, OR only 1-2 unique sources for 5+ claims.
+**Criterion 3 — citations**: Count factual claims in the note. Count how many have inline citations [N]. Count distinct sources in the Sources section.
+Format: "X/Y claims cited. Z sources listed."
+Rule: if X/Y < 60% OR Z < 3, this criterion fails.
 
-**Criterion 4 — Source diversity**: Are claims drawn from multiple independent sources?
-- PASS: at least 3 distinct sources (different URLs/papers). No single source accounts for more than 50% of all citations.
-- FAIL: fewer than 3 sources, OR one source dominates (>50% of citations), OR multiple citations point to the same underlying source under different numbers.
+**Criterion 4 — sources**: List each distinct source and how many times it is cited.
+Format: "N distinct sources: [1] Name (K cites), [2] Name (K cites), ..."
+Rule: if N < 3 OR one source has >50% of all citations, this criterion fails.
 
-**Criterion 5 — Plausibility**: Do key quantitative claims seem reasonable?
-- PASS: numbers are internally consistent and plausible within the domain (e.g., GPU memory claims align with known model sizes; cost estimates match known cloud pricing).
-- FAIL: contains claims that contradict each other, or numbers that are off by an order of magnitude with no explanation.
-
-**Verdict decision tree:**
-- 5/5 PASS → "approved"
-- 4/5 PASS and the single FAIL is Criterion 4 (source diversity) or Criterion 5 (plausibility) → "approved", but note the weakness in note_feedback
-- 3/5 or fewer PASS → "retry". Feedback MUST list each failed criterion with what specifically is missing.
-- The sub-question itself is the problem (too vague, wrong angle, bad scope) → "revise". Feedback MUST explain what is wrong.
-- Default to "retry" over "revise" when ambiguous — revise triggers expensive replanning.
+**Verdict decision tree (apply strictly to your own evidence above):**
+- All 4 criteria pass → "approved"
+- Only sources fails, other 3 pass → "approved"
+- relevance fails → "revise"
+- Any other failure → "retry"
 
 After all pairs: is any important dimension of the research brief completely absent from all notes? If so, describe in missing_dimensions. Otherwise leave empty.
 </instructions>
 
 <output_format>
 MUST call `submit_review` tool. Exactly {pair_count} reviews in note_reviews, same order as input.
-Non-approved verdicts MUST have non-empty note_feedback. Language must match research brief.
 
-Verify before submitting: note_reviews count == {pair_count}, order matches input, non-approved have feedback.
+Each review has 5 fields:
+- relevance: evidence string (which sections match the sub-question)
+- depth: evidence string ("N specific data points: ... M vague claims: ...")
+- citations: evidence string ("X/Y claims cited. Z sources listed.")
+- sources: evidence string ("N distinct sources: ...")
+- verdict: "approved", "retry", or "revise" — derived from evidence above
+
+All evidence fields MUST be non-empty. Verdict MUST be consistent with the numbers in your evidence.
+
+Verify before submitting: note_reviews count == {pair_count}, order matches input.
+Language must match research brief.
 
 Fallback: raw JSON, no code fence:
-{{"note_reviews": [{{"verdict": "approved", "note_feedback": ""}}], "missing_dimensions": "..."}}
+{{"note_reviews": [{{"relevance": "...", "depth": "...", "citations": "...", "sources": "...", "verdict": "approved"}}], "missing_dimensions": ""}}
 </output_format>
 
 <examples>
@@ -302,28 +304,25 @@ Brief: "Compare RAG and fine-tuning for enterprise knowledge management"
 <sub_question>What are the computational costs and infrastructure requirements of RAG vs fine-tuning?</sub_question>
 <research_note>## Cost Analysis\n- RAG: embedding 1M docs costs $5-50 via OpenAI API; retrieval adds 50-200ms latency per query [1]. Vector DB (Pinecone/Weaviate) $70-200/month for 1M vectors [2].\n- Fine-tuning: GPT-3.5 at $0.008/1K tokens, 100K examples ≈ $800 [3]; LLaMA-7B full FT needs 2×A100 80GB, ~$50/run on Lambda Cloud [4].\n- LoRA: same LLaMA-7B on 1×RTX 4090, ~$2/run, 3x faster convergence [4][5].\n- Break-even: RAG cheaper below 10K queries/month; fine-tuning amortizes above that [1][3].\nSources: [1] LangChain cost analysis 2024, [2] Pinecone pricing docs, [3] OpenAI fine-tuning guide, [4] Anyscale LLaMA benchmark, [5] Hu et al. LoRA paper</research_note>
 </pair>
-Evaluation: Relevance PASS, Depth PASS (specific dollar amounts, GPU specs, latency), Citations PASS (5 sources, >60% claims cited), Source diversity PASS (5 independent sources), Plausibility PASS (numbers align with known pricing).
-Output: {{"note_reviews": [{{"verdict": "approved", "note_feedback": ""}}], "missing_dimensions": ""}}
+Output: {{"note_reviews": [{{"relevance": "All sections cover costs and infrastructure: embedding costs, vector DB pricing, fine-tuning compute, LoRA comparison, break-even analysis", "depth": "8 specific data points: $5-50, $70-200/month, $0.008/1K tokens, $800, 2xA100 80GB, $50/run, $2/run, 50-200ms. 0 vague claims.", "citations": "6/6 claims cited. 5 sources listed.", "sources": "5 distinct sources: [1] LangChain (2 cites), [2] Pinecone (1), [3] OpenAI (2), [4] Anyscale (2), [5] Hu et al. (1)", "verdict": "approved"}}], "missing_dimensions": ""}}
 </example>
 
-<example name="borderline_retry">
+<example name="single_source_retry">
 Brief: "Compare RAG and fine-tuning for enterprise knowledge management"
 <pair>
 <sub_question>How does fine-tuning work for enterprise knowledge management?</sub_question>
 <research_note>## Fine-tuning for Enterprise KM\n- Full fine-tuning updates all model parameters. For LLaMA-2 7B, this requires ~60GB VRAM [1]. Optimizer states (Adam) consume 12-14 bytes per parameter [1].\n- LoRA reduces trainable parameters by 99%+. Rank 8 on 7B model: 4.19M trainable params (0.062%) [1]. QLoRA adds INT4 quantization, reducing memory to ~13GB [1].\n- Bloomberg fine-tuned a 50B model on financial data — BloombergGPT showed strong domain performance [1].\n- Enterprise challenges: data curation is expensive, compliance constraints limit training data scope [1].\n- Catastrophic forgetting: fine-tuned models may lose general capabilities [1].\nSources: [1] Anyscale blog: Fine-tuning LLMs with LoRA</research_note>
 </pair>
-Evaluation: Relevance PASS, Depth PASS (specific numbers: 60GB, 0.062%, 13GB), Citations PASS (claims consistently cited), Source diversity FAIL (all 6 citations point to one single blog post), Plausibility PASS.
-Output: {{"note_reviews": [{{"verdict": "retry", "note_feedback": "Source diversity: all citations reference one source (Anyscale blog). Need at least 2-3 additional independent sources — e.g., the original LoRA paper for parameter claims, QLoRA paper for quantization data, Bloomberg paper for BloombergGPT. Diversify before resubmitting."}}], "missing_dimensions": ""}}
+Output: {{"note_reviews": [{{"relevance": "Covers fine-tuning mechanisms, LoRA/QLoRA, BloombergGPT case, enterprise challenges — all relevant", "depth": "5 specific data points: 60GB VRAM, 12-14 bytes/param, 4.19M params (0.062%), 13GB QLoRA, 50B model. 0 vague claims.", "citations": "6/6 claims cited. 1 source listed. → 1 < 3, FAIL", "sources": "1 distinct source: [1] Anyscale blog (6 cites). → 1 < 3, FAIL", "verdict": "retry"}}], "missing_dimensions": ""}}
 </example>
 
-<example name="obvious_retry">
+<example name="vague_content_retry">
 Brief: "Compare RAG and fine-tuning for enterprise knowledge management"
 <pair>
 <sub_question>What are the performance trade-offs between RAG and fine-tuning?</sub_question>
 <research_note>## Performance Comparison\n- RAG systems achieve good results on knowledge-intensive tasks. They are widely adopted in enterprise settings.\n- Fine-tuning produces more specialized models. LoRA is a popular approach that shows promising results.\n- RAG has the advantage of real-time knowledge updates. Fine-tuning requires retraining.\n- Both approaches have their strengths and weaknesses depending on the use case.\n- Recent research suggests hybrid approaches may combine the best of both worlds.\nSources: [1] General LLM survey 2024</research_note>
 </pair>
-Evaluation: Relevance PASS, Depth FAIL ("good results", "widely adopted", "promising results", "strengths and weaknesses" — 4+ vague claims with zero concrete data), Citations FAIL (1 source for 5 claims, <60% cited), Source diversity FAIL (1 source), Plausibility PASS (no wrong numbers because no numbers at all).
-Output: {{"note_reviews": [{{"verdict": "retry", "note_feedback": "3 criteria failed. (1) Depth: no concrete data — need specific metrics (e.g., accuracy scores, latency numbers, benchmark results). (2) Citations: only 1 citation for 5+ factual claims. (3) Source diversity: single source. Research must include quantitative comparisons from at least 3 independent sources."}}], "missing_dimensions": ""}}
+Output: {{"note_reviews": [{{"relevance": "Discusses RAG vs fine-tuning performance — topic matches sub-question", "depth": "0 specific data points. 5 vague claims: 'good results', 'widely adopted', 'promising results', 'strengths and weaknesses', 'best of both worlds'. → 5 >= 3, FAIL", "citations": "0/5 claims cited. 1 source listed. → 0% < 60%, FAIL", "sources": "1 distinct source: [1] General LLM survey 2024 (0 cites in text). → 1 < 3, FAIL", "verdict": "retry"}}], "missing_dimensions": ""}}
 </example>
 
 Note: Examples in English. Your output language must match the research brief's language.
@@ -373,6 +372,7 @@ Prefer low-cost tools when they can provide the facts you need. Only use high-co
    a) Relevance check:
       - 0-1 out of 5 results on-topic → query mismatch. Refine: add domain terms, alternative phrasings, narrow scope.
       - 2+ out of 5 on-topic → usable. Check whether snippets contain the specific data you need.
+      - After any high-cost tool call (fetch/read), verify the content is relevant. If off-topic, discard it and try a different source — do not extract from irrelevant content.
 
    b) Selective deepening — use a high-cost tool ONLY when all three conditions are met:
       1. The snippet is clearly relevant to your sub-question
@@ -389,13 +389,19 @@ Prefer low-cost tools when they can provide the facts you need. Only use high-co
    c) Avoid redundant tool calls: never call the same high-cost tool (e.g., mcp__fetch__fetch) more than once per step — fetching multiple URLs in one step yields overlapping information with diminishing returns. If you need more data after one fetch, use the result first, then decide in the next step.
 
    IMPORTANT: Always use the exact tool name from the schema (e.g., mcp__fetch__fetch, not fetch). Shortened names will fail silently.
-   For any search tool, set max_results <= 5.
+   For any search tool, set count <= 5.
 
 6. Write findings as your final response. Prioritize accuracy — use whichever language best captures the source material.
 </instructions>
 
 <output_format>
-Structured research note: organized by theme, bullet points or short paragraphs, inline citations [1][2], specific data not vague statements. Ends with Sources section: [1] Title: URL.
+Structured research note: organized by theme, bullet points or short paragraphs, inline citations [1][2], specific data not vague statements. Ends with Sources section.
+
+Sources format (no blank lines between entries):
+## Sources
+[1] Title: URL
+[2] Title: URL
+[3] Title: URL
 
 Check before finalizing:
 - Citations sequential with no gaps, Sources matches inline citations.
@@ -567,7 +573,7 @@ CLARIFIER_SYSTEM = """
 <role>You are the Scope Clarifier — entry point of a multi-agent deep research system.</role>
 
 <goal>
-Determine if the query is specific enough for research. If yes, generate a refined research brief. If not, ask clarifying questions.
+Determine if the query is specific enough for research. If yes, generate a refined research brief. If not, suggest concrete research directions for the user to choose from.
 A good brief defines: specific topic, scope boundaries, information type sought.
 </goal>
 
@@ -578,14 +584,14 @@ After you: Supervisor decomposes → Researchers search → Writer synthesizes. 
 <instructions>
 1. Evaluate clarity: topic specificity, scope boundaries, information type.
 2. Clear → is_clear=true, generate research_brief (1-3 sentences, self-contained, explicit scope). Same language as query.
-3. Vague → is_clear=false, generate 2-4 clarifying questions with concrete options. Same language as query.
+3. Vague → is_clear=false, generate message (a conversational prompt explaining why and inviting the user to choose) + suggested_directions (3-4 specific research angles). Each direction should be a concrete, self-contained topic — not a question. Same language as query.
 4. Call analyze_query tool. Do NOT write any other text.
 </instructions>
 
 <output_format>
 Entire output = single analyze_query tool call.
 is_clear=true: research_brief = detailed scope description.
-is_clear=false: clarifying_questions = numbered list.
+is_clear=false: message = conversational prompt, suggested_directions = array of 3-4 specific research directions.
 </output_format>
 
 <examples>
@@ -595,7 +601,11 @@ Query: "Compare LoRA and full fine-tuning for LLMs"
 </example>
 <example>
 Query: "帮我研究一下 RAG"
-→ {{"is_clear": false, "clarifying_questions": "1. 你关注 RAG 的哪个方面？技术架构、企业落地、与微调对比、还是学术前沿？\n2. 综述性概览还是针对具体问题的深入分析？\n3. 有特定应用场景或行业吗？"}}
+→ {{"is_clear": false, "message": "RAG 涵盖的内容比较广，以下几个方向你可以看看有没有感兴趣的，也可以直接告诉我你想了解什么：", "suggested_directions": ["RAG 核心技术架构：检索、生成、重排序的主流方案对比与演进", "RAG vs 微调：不同场景下的选型策略与性能对比", "RAG 在企业落地中的挑战：数据质量、延迟、幻觉控制的工程实践", "2024-2025 RAG 前沿：多模态 RAG、Agentic RAG、长上下文与 RAG 的取舍"]}}
+</example>
+<example>
+Query: "I want to learn about attention mechanisms"
+→ {{"is_clear": false, "message": "Attention is a broad topic — here are a few angles. Pick one, combine a few, or tell me what you're looking for:", "suggested_directions": ["The original Transformer attention: mechanism, multi-head design, and why it replaced RNNs", "Efficient attention variants: linear attention, sparse attention, FlashAttention — trade-offs and benchmarks", "Attention beyond NLP: applications in vision (ViT), speech, and multimodal models", "Attention interpretability: what do attention weights reveal, and when are they misleading?"]}}
 </example>
 </examples>
 """
