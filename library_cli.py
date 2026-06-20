@@ -3,6 +3,7 @@ import json
 import os
 
 from sage_research.config import Config
+from sage_research.orchestrator import Orchestrator
 
 
 def cmd_list(data_dir: str):
@@ -24,50 +25,16 @@ def cmd_list(data_dir: str):
 
 
 def cmd_add(config: Config, src: str, title: str, overwrite: bool):
-    from sage_research.rag import Pipeline
-    from sage_research.mcp import create_mcp_clients, register_mcp_tools
-    from sage_research.tools import ToolRegistry
-    from sage_research.tools.tool_paper import PaperReaderTool
-    from sage_research.library import LibraryManager
-
-    pipeline = Pipeline(data_dir=config.data_dir)
-    clients = create_mcp_clients(os.path.join(config.config_dir, "mcp_servers.json"))
-    try:
-        registry = ToolRegistry()
-        register_mcp_tools(registry, clients)
-
-        download_tool = registry.tools["mcp__paper-search__download_arxiv"]
-        read_tool = registry.tools["mcp__paper-search__read_arxiv_paper"]
-        paper_reader = PaperReaderTool(download_tool, read_tool)
-        pdfmux_tool = registry.tools["mcp__pdfmux__convert_pdf"]
-
-        manager = LibraryManager(
-            data_dir=config.data_dir,
-            paper_tool=paper_reader,
-            pdfmux_tool=pdfmux_tool,
-            pipeline=pipeline,
-        )
+    with Orchestrator(config) as orch:
+        manager = orch.create_library_manager()
         manager.ingest(src, custom_title=title, overwrite=overwrite)
-        
-    finally:
-        paper_reader.cleanup()
-        for client in clients:
-            client.disconnect()
 
 
 def cmd_delete(config: Config, title: str):
-    from sage_research.rag import Pipeline
-    from sage_research.library import LibraryManager
-
-    pipeline = Pipeline(data_dir=config.data_dir)
-    manager = LibraryManager(
-        data_dir=config.data_dir,
-        paper_tool=None,
-        pdfmux_tool=None,
-        pipeline=pipeline,
-    )
-    manager.delete_doc(title)
-    print(f"已删除: {title}")
+    with Orchestrator(config) as orch:
+        manager = orch.create_library_manager()
+        manager.delete_doc(title)
+        print(f"已删除: {title}")
 
 
 def main():

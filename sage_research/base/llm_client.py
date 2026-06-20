@@ -43,7 +43,7 @@ def _resolve_model_env(model: str) -> tuple[str, str, dict | None]:
     )
 
 
-class TestAgent:
+class LLMClient:
     def __init__(
         self,
         model: str = None,
@@ -105,7 +105,7 @@ class TestAgent:
 
 if __name__ == "__main__":
     try:
-        agent = TestAgent()
+        agent = LLMClient()
 
         messages = [
             {

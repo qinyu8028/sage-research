@@ -1,19 +1,11 @@
 import argparse
-import json
 import logging
-import os
 
-from sage_research.base import TestAgent, setup_logging
-from sage_research.context import ContextBuilder, TokenCounter, HistoryCompactor
-from sage_research.graph import build_graph
-from sage_research.rag import Pipeline
-from sage_research.tools import ToolRegistry, RAGTool
-from sage_research.tools.tool_paper import PaperReaderTool
-from sage_research.mcp import create_mcp_clients, register_mcp_tools
-from sage_research.agents import Clarifier, Supervisor, Writer, Researcher
-from sage_research.search import SearchTool
+from sage_research.base import setup_logging
+from sage_research.agents import Clarifier
 from sage_research.config import Config
-from sage_research.display import stream_graph
+from sage_research.orchestrator import Orchestrator
+from sage_research.display import stream_events
 
 logger = logging.getLogger("sage_research.main")
 display = logging.getLogger("sage_research.display")
@@ -46,75 +38,18 @@ def main():
     if args.data_dir:
         config.data_dir = args.data_dir
 
-    llm = TestAgent(model=config.llm.model, timeout=config.llm.timeout)
-
-    token_counter = TokenCounter()
-    history_compactor = HistoryCompactor(
-        llm_client=llm,
-        token_counter=token_counter,
-    )
-    # TODO: add memory system
-    context_builder = ContextBuilder(
-        history_compactor=history_compactor,
-        token_counter=token_counter,
-        max_tokens=config.context.max_tokens,
-        reserve_ratio=config.context.reserve_ratio,
-    )
-
-    pipeline = Pipeline(data_dir=config.data_dir, llm_client=llm)
-
-    clients = create_mcp_clients(os.path.join(config.config_dir, "mcp_servers.json"))
-    try:
-        registry = ToolRegistry()
-        register_mcp_tools(registry, clients)
-
-        # search tool fallback integration
-        brave_tool = registry.tools["mcp__brave-search__brave_web_search"]
-        tavily_tool = registry.tools["mcp__tavily__tavily_search"]
-        registry.register_tool(SearchTool(brave_tool, tavily_tool))
-
-        # self-defined tools
-        registry.register_tool(RAGTool(pipeline))
-
-        download_tool = registry.tools["mcp__paper-search__download_arxiv"]
-        read_tool = registry.tools["mcp__paper-search__read_arxiv_paper"]
-        paper_reader = PaperReaderTool(download_tool, read_tool)
-        registry.register_tool(paper_reader)
-
-        with open(os.path.join(config.config_dir, "agents.json")) as f:
-            agent_configs = json.load(f)
-        researcher_whitelist = agent_configs["researcher"]["allowed_tools"]
-        researcher_tools = registry.get_tools(researcher_whitelist)
-
+    with Orchestrator(config) as orch:
         raw_query = args.query or input("请输入研究问题: ")
-        clarifier = Clarifier(llm=llm)
+        clarifier = Clarifier(llm=orch.llm_client)
         research_brief = clarifier.run(raw_query)
-
-        supervisor = Supervisor(llm=llm, context_builder=context_builder, max_steps=config.max_steps)
-        writer = Writer(llm=llm, context_builder=context_builder)
-
-        # make sure that every researcher's history is independent
-        def create_researcher(researcher_id: str = "R-?"):
-            return Researcher(
-                name=researcher_id,
-                llm=llm,
-                context_builder=context_builder,
-                tool_list=researcher_tools,
-                max_steps=config.max_steps,
-            )
-
-        graph = build_graph(supervisor, create_researcher, writer, pipeline, config.max_rounds)
 
         display.info("\n" + "=" * 60)
         display.info("开始研究: %s", research_brief)
         display.info("=" * 60)
 
-        stream_graph(graph, {"research_brief": research_brief})
+        stream_events(orch.run_research(research_brief))
 
-    finally:
-        paper_reader.cleanup()
-        for client in clients:
-            client.disconnect()
+        llm = orch.llm_client
         total_tokens = llm.total_prompt_tokens + llm.total_completion_tokens
         logger.info("统计: %d 次调用, tokens=%d(in:%d+out:%d)", llm.total_calls, total_tokens, llm.total_prompt_tokens, llm.total_completion_tokens)
         display.info("\n--- 统计 ---")

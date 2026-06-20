@@ -8,7 +8,7 @@ from .chunker import TextChunker
 from .embedding import Embedding
 from .document import Document, Chunk
 from .mqe import MQE
-from ..base import TestAgent
+from ..base import LLMClient
 
 
 INGEST_PROMPT = """你是一个知识库管理助手。你需要判断搜索结果是否包含有价值的知识内容，值得保存到本地知识库中。
@@ -68,7 +68,7 @@ class Pipeline:
     SEARCH_CACHE_DIR = "search_cache"
 
     def __init__(
-        self, data_dir: str, llm_client: TestAgent | None = None, mqe: MQE | None = None
+        self, data_dir: str, llm_client: LLMClient | None = None, mqe: MQE | None = None
     ) -> None:
         self.chunker = TextChunker()
         self.reranker = Reranker()

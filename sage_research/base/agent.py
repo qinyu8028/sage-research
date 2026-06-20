@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 from .message import Message
-from .llm_client import TestAgent as llm_client
+from .llm_client import LLMClient as llm_client
 
 if TYPE_CHECKING:
     from ..context.context_builder import ContextBuilder

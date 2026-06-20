@@ -1,7 +1,7 @@
 import json
 import logging
 
-from ..base.llm_client import TestAgent as llm_client
+from ..base.llm_client import LLMClient as llm_client
 from .prompts import CLARIFIER_SYSTEM, CLARIFIER_USER, CLARIFIER_REFINE_USER
 
 logger = logging.getLogger(__name__)

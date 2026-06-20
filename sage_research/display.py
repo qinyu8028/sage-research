@@ -70,7 +70,7 @@ def print_write(output):
     _log(report)
 
 
-def stream_graph(graph, inputs: dict):
+def stream_events(events):
     printers = {
         "plan_node": print_plan,
         "research_node": print_research,
@@ -78,8 +78,7 @@ def stream_graph(graph, inputs: dict):
         "write_node": print_write,
     }
     t_start = time.time()
-    result = None
-    for event in graph.stream(inputs):
+    for event in events:
         for node_name, output in event.items():
             elapsed = time.time() - t_start
             print_stage_header(node_name, elapsed)
@@ -88,7 +87,5 @@ def stream_graph(graph, inputs: dict):
                 printer(output)
             else:
                 _log(f"  output keys: {list(output.keys())}")
-            result = output
     elapsed = time.time() - t_start
     _log(f"\n总耗时: {elapsed:.1f}s")
-    return result

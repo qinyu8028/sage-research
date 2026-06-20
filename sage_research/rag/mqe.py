@@ -1,4 +1,4 @@
-from ..base import TestAgent
+from ..base import LLMClient
 
 
 SYSTEM_PROMPT_TEMPLATE = (
@@ -26,7 +26,7 @@ SYSTEM_PROMPT_TEMPLATE = (
 
 
 class MQE:
-    def __init__(self, llm_client: TestAgent, n: int = 3):
+    def __init__(self, llm_client: LLMClient, n: int = 3):
         self.llm_client = llm_client
         self.n = n
 

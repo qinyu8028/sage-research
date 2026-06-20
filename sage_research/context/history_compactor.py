@@ -1,7 +1,7 @@
 import logging
 import re
 
-from ..base import TestAgent
+from ..base import LLMClient
 from .token_counter import TokenCounter
 from ..base import Message
 from .compact_prompts import SUMMARY_PROMPT, HISTORY_COMPRESS_SYSTEM, HISTORY_COMPRESS_BATCH_USER
@@ -15,7 +15,7 @@ _TOOL_DELIMITER_RE = re.compile(r'===TOOL \d+===')
 class HistoryCompactor:
     def __init__(
         self,
-        llm_client: TestAgent,
+        llm_client: LLMClient,
         token_counter: TokenCounter,
     ) -> None:
         self.llm_client = llm_client
