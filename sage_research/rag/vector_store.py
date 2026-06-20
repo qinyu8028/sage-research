@@ -10,18 +10,19 @@ from .document import Chunk
 class VectorStore:
     def __init__(self) -> None:
         self.chunks: list[Chunk] = []
-        self._tokenized_docs: list[list[str]] = []
+        self._file_index: dict[str, list[Chunk]] = {}
 
     def add_chunks(self, chunks: list[Chunk]):
-        self.chunks.extend(chunks)
         for chunk in chunks:
-            tokenized_content = jieba.lcut(chunk.content)
-            self._tokenized_docs.append(tokenized_content)
+            if chunk.tokens is None:
+                chunk.tokens = jieba.lcut(chunk.content)
+            self.chunks.append(chunk)
+            self._file_index.setdefault(chunk.file_path, []).append(chunk)
 
     def cosine_search(
         self, query_embedding: list[float], top_k: int
     ) -> list[tuple[Chunk, float]]:
-        scores = []
+        score_pairs = []
         mod_query = math.sqrt(sum(x**2 for x in query_embedding))
 
         for chunk in self.chunks:
@@ -31,14 +32,14 @@ class VectorStore:
                 dot += qi * ei
             mod_ebd = math.sqrt(sum(x**2 for x in ebd))
             cosine_score = dot / (mod_query * mod_ebd)
-            scores.append((chunk, cosine_score))
+            score_pairs.append((chunk, cosine_score))
 
-        scores = sorted(scores, key=lambda x: x[1], reverse=True)
+        score_pairs = sorted(score_pairs, key=lambda x: x[1], reverse=True)
 
-        return scores[:top_k]
+        return score_pairs[:top_k]
 
     def bm25_search(self, query: str, top_k: int) -> list[tuple[Chunk, float]]:
-        bm25 = BM25Okapi(self._tokenized_docs)
+        bm25 = BM25Okapi([chunk.tokens for chunk in self.chunks])
         bm25_scores = bm25.get_scores(jieba.lcut(query))
         scores = []
         for chunk, bm25_score in zip(self.chunks, bm25_scores):
@@ -93,3 +94,13 @@ class VectorStore:
         vector_store.add_chunks(chunks=chunks)
 
         return vector_store
+
+    def remove_by_filepath(self, file_path: str) -> int:
+        if file_path not in self._file_index:
+            return 0
+
+        count = len(self._file_index[file_path])
+        self.chunks = [chunk for chunk in self.chunks if chunk.file_path != file_path]
+        del self._file_index[file_path]
+        
+        return count

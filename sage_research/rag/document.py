@@ -6,6 +6,7 @@ class Chunk(BaseModel):
     content: str
     file_path: str
     embedding: list[float] | None = None
+    tokens: list[str] | None = None
     
 
 class Document(BaseModel):

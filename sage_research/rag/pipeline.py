@@ -87,7 +87,7 @@ class Pipeline:
             else VectorStore()
         )
 
-    def add_document(self, file_path: str):
+    def add_document(self, file_path: str, save: bool = True):
         document = Document.read_file(file_path)
         chunks = self.chunker.chunk(document)
         text_chunks = [chunk.content for chunk in chunks]
@@ -97,7 +97,8 @@ class Pipeline:
             chunk.embedding = ebd
 
         self.vector_store.add_chunks(chunks)
-        self.save()
+        if save:
+            self.save()
 
     def add_text(self, text: str, query: str):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
