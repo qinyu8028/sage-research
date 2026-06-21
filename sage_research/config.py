@@ -1,9 +1,10 @@
+import os
 from dataclasses import dataclass, field
 
 
 @dataclass
 class LLMConfig:
-    model: str = "GLM-4-Flash"
+    model: str = os.getenv("LLM_MODEL_ID", "GLM-4-Flash")
     temperature: float = 0.0
     timeout: int = 120
 
