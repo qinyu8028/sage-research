@@ -22,17 +22,17 @@ searches across web and academic sources in parallel, and synthesizes structured
 ## Architecture
 
 ```
-User Query
-    │
-    ▼
-┌───────────┐   unclear    ┌─────────────────┐
-│ Clarifier │─────────────▶│  User Feedback  │
-└─────┬─────┘              └────────┬────────┘
-      │ clear                       │
-      ▼                             ▼
-research_brief ◀────────────────────┘
-      │
-      ▼
+            User Query
+            │
+            ▼
+            ┌───────────┐   unclear    ┌─────────────────┐
+            │ Clarifier │────────────▶│  User Feedback  │
+            └─────┬─────┘              └────────┬────────┘
+                  │ clear                       │
+                  ▼                             ▼
+            research_brief ◀───────────────────┘
+                  │
+                  ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                      LangGraph Pipeline                     │
 │                                                             │
