@@ -27,7 +27,13 @@ def cmd_list(data_dir: str):
 def cmd_add(config: Config, src: str, title: str, overwrite: bool):
     with Orchestrator(config) as orch:
         manager = orch.create_library_manager()
-        manager.ingest(src, custom_title=title, overwrite=overwrite)
+        result = manager.ingest(src, custom_title=title, overwrite=overwrite)
+        messages = {
+            "skipped": f"已跳过: {result.title}（已存在）",
+            "overwritten": f"已覆盖: {result.title}",
+            "created": f"已入库: {result.title}",
+        }
+        print(messages[result.status])
 
 
 def cmd_delete(config: Config, title: str):

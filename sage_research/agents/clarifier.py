@@ -1,6 +1,7 @@
 import json
 import logging
 
+from ..api.schemas import ClarifyResult
 from ..base.llm_client import LLMClient as llm_client
 from .prompts import CLARIFIER_SYSTEM, CLARIFIER_USER, CLARIFIER_REFINE_USER
 
@@ -46,6 +47,32 @@ class Clarifier:
         self.system_prompt = system_prompt
 
     def run(self, raw_query: str) -> str:
+        result = self.analyze(raw_query)
+        if result.is_clear:
+            return result.brief
+
+        message = result.message
+        directions = result.directions
+        
+        # display
+        if message:
+            display.info("\n%s", message)
+        if directions:
+            for i, d in enumerate(directions, 1):
+                display.info("  %d. %s", i, d)
+
+        # parse response
+        user_response = input("> ").strip()
+        if directions and user_response.isdigit():
+            idx = int(user_response) - 1
+            if 0 <= idx < len(directions):
+                user_response = directions[idx]
+
+        response = self.refine(raw_query=raw_query, user_response=user_response)
+
+        return response
+
+    def analyze(self, raw_query: str) -> ClarifyResult:
         messages = [
             {"role": "system", "content": self.system_prompt},
             {"role": "user", "content": CLARIFIER_USER.format(raw_query=raw_query)},
@@ -59,32 +86,28 @@ class Clarifier:
 
         if not response.tool_calls:
             logger.warning("[Clarifier] function calling 失败，直接使用原始 query")
-            return raw_query
+            return ClarifyResult(is_clear=True, brief=raw_query)
 
         args: dict = json.loads(response.tool_calls[0].function.arguments)
 
         if args.get("is_clear"):
-            brief = args.get("research_brief", raw_query)
             logger.info("[Clarifier] query 足够具体，生成 research_brief")
-            return brief
+            return ClarifyResult(
+                is_clear=True,
+                brief=args.get("research_brief", raw_query),
+            )
 
-        message = args.get("message", "")
-        directions = args.get("suggested_directions", [])
-        if message:
-            display.info("\n%s", message)
-        if directions:
-            for i, d in enumerate(directions, 1):
-                display.info("  %d. %s", i, d)
+        logger.info("[Clarifier] query 不够具体，询问用户确认")
+        return ClarifyResult(
+            is_clear=False,
+            directions=args.get("suggested_directions", []),
+            message=args.get("message"),
+        )
 
-        user_response = input("> ").strip()
+    def refine(self, raw_query: str, user_response: str) -> str:
         if not user_response:
             logger.info("[Clarifier] 用户未回答，直接使用原始 query")
             return raw_query
-
-        if directions and user_response.isdigit():
-            idx = int(user_response) - 1
-            if 0 <= idx < len(directions):
-                user_response = directions[idx]
 
         refine_messages = [
             {"role": "system", "content": self.system_prompt},
@@ -94,4 +117,5 @@ class Clarifier:
         ]
         refine_response = self.llm.invoke(messages=refine_messages, tag="clarifier:refine")
         logger.info("[Clarifier] 生成 research_brief 完成")
+
         return refine_response.content

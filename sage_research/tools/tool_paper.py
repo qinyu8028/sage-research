@@ -37,27 +37,27 @@ class PaperReaderTool(BaseTool):
         )
         self._download_tool = download_tool
         self._read_tool = read_tool
-        self._download_dir = os.path.join(tempfile.gettempdir(), "sage_arxiv_papers")
+        self.download_dir = os.path.join(tempfile.gettempdir(), "sage_arxiv_papers")
 
     def run_tool(self, parameters: dict[str, Any]) -> str:
         paper_id = parameters.get("paper_id", "").strip()
         if not paper_id:
             return "Error: missing required parameter 'paper_id'."
 
-        os.makedirs(self._download_dir, exist_ok=True)
+        os.makedirs(self.download_dir, exist_ok=True)
 
-        pdf_path = os.path.join(self._download_dir, f"{paper_id}.pdf")
+        pdf_path = os.path.join(self.download_dir, f"{paper_id}.pdf")
         if os.path.exists(pdf_path):
             logger.info("[PaperReader] cache hit: %s", paper_id)
         else:
-            self._download_tool.run_tool({"paper_id": paper_id, "save_path": self._download_dir})
+            self._download_tool.run_tool({"paper_id": paper_id, "save_path": self.download_dir})
             logger.info("[PaperReader] downloaded: %s", paper_id)
 
-        content = self._read_tool.run_tool({"paper_id": paper_id, "save_path": self._download_dir})
+        content = self._read_tool.run_tool({"paper_id": paper_id, "save_path": self.download_dir})
         logger.info("[PaperReader] read: %s, %d chars", paper_id, len(content))
         return content
 
     def cleanup(self):
-        if os.path.exists(self._download_dir):
-            shutil.rmtree(self._download_dir)
-            logger.info("[PaperReader] cleaned up: %s", self._download_dir)
+        if os.path.exists(self.download_dir):
+            shutil.rmtree(self.download_dir)
+            logger.info("[PaperReader] cleaned up: %s", self.download_dir)

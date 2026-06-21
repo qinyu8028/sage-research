@@ -8,6 +8,7 @@ from .converter import convert_to_markdown
 from ..tools import PaperReaderTool
 from ..mcp import MCPTool
 from ..rag import Pipeline
+from ..api.schemas import IngestResult
 
 
 class LibraryManager:
@@ -29,15 +30,20 @@ class LibraryManager:
         os.makedirs(self.originals_dir, exist_ok=True)
         os.makedirs(self.converted_dir, exist_ok=True)
 
-    def ingest(self, src: str, custom_title: str = None, overwrite: bool = True):
+    def ingest(
+        self, src: str, custom_title: str = None, overwrite: bool = True
+    ) -> IngestResult:
+
         entries = self.list_docs()
 
         arxiv_match = re.match(r"^\d{4}\.\d{4,5}", src)
         if arxiv_match:
             for entry in entries:
                 if entry.get("arxiv_id") == arxiv_match.group():
-                    print(f"arXiv {arxiv_match.group()} 已存在，跳过")
-                    return
+                    return IngestResult(
+                        title=src,
+                        status="skipped"
+                    )
 
         metadata = convert_to_markdown(
             src=src,
@@ -56,21 +62,35 @@ class LibraryManager:
 
         if existing:
             if not overwrite:
-                print(f"文件 {metadata.title} 已存在，跳过")
-                return
+                return IngestResult(
+                    title=metadata.title,
+                    status="skipped"
+                )
             else:
                 self._remove_files(existing)
                 entries.remove(existing)
+                status = "overwritten"
+        else:
+            status = "created"
 
-        if not arxiv_match:
+        if arxiv_match:
+            pdf_src = os.path.join(self.paper_tool.download_dir, f"{src}.pdf")
+            if os.path.exists(pdf_src):
+                shutil.copy(pdf_src, self.originals_dir)
+        else:
             shutil.copy(src, self.originals_dir)
 
         self.pipeline.add_document(metadata.output_path, save=False)
 
+        if arxiv_match:
+            original_path = os.path.join(self.originals_dir, f"{src}.pdf")
+        else:
+            original_path = os.path.join(self.originals_dir, os.path.basename(src))
+
         index_entry_dict = {
-            "title": metadata.title, 
+            "title": metadata.title,
             "arxiv_id": metadata.arxiv_id,
-            "original_path": os.path.join(self.originals_dir, os.path.basename(src)) if not arxiv_match else None, 
+            "original_path": original_path,
             "converted_path": metadata.output_path,
             "source_type": metadata.source_type,
             "added_at": datetime.now().isoformat()
@@ -79,6 +99,11 @@ class LibraryManager:
 
         self._save_index(entries)
         self.pipeline.save()
+
+        return IngestResult(
+            title=metadata.title,
+            status=status
+        )
 
     def list_docs(self) -> list[dict]:
         if not os.path.exists(self.index_path):
