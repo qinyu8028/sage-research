@@ -17,7 +17,7 @@ class Orchestrator:
         self.config = config
         self.llm_client = LLMClient(model=config.llm.model, timeout=config.llm.timeout)
         token_counter = TokenCounter()
-        history_compactor = HistoryCompactor(llm_client=self.llm_client)
+        history_compactor = HistoryCompactor(llm_client=self.llm_client, token_counter=token_counter)
         self.context_builder = ContextBuilder(
             history_compactor=history_compactor,
             token_counter=token_counter,

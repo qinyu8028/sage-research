@@ -28,6 +28,7 @@ class State(TypedDict):
     refine_round: int
     final_report: str
     retry_items: list[dict]
+    review_summary: list[dict]
 
 
 class InputSchema(TypedDict):
@@ -126,12 +127,18 @@ def build_graph(
             if note_review.verdict == "retry"
         ]
 
+        review_summary = [
+            {"question": state["pending_review_pairs"][i][0], "verdict": nr.verdict}
+            for i, nr in enumerate(result.note_reviews)
+        ]
+
         return {
             "review_result": result,
             "approved_pairs": approved_pairs,
             "refine_round": state.get("refine_round", 0) + 1,
             "pending_review_pairs": [],
             "retry_items": retry_items,
+            "review_summary": review_summary,
         }
 
     def write_node(state: State) -> dict:
