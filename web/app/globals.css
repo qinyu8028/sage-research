@@ -44,6 +44,25 @@ html {
   scrollbar-gutter: stable;
 }
 
+/* Thin scrollbars */
+.thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.12) transparent;
+}
+.thin-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+.thin-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 3px;
+}
+.thin-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.22);
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
@@ -148,8 +167,8 @@ body {
 
 /* Text shimmer — loading placeholder */
 @keyframes text-shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 .shimmer-text {
   background: linear-gradient(
@@ -181,16 +200,18 @@ body {
 .report-prose h2 {
   font-size: 21px;
   font-weight: 620;
-  margin: 2em 0 0.6em;
+  margin: 2.4em 0 0.6em;
   line-height: 1.35;
-  padding-bottom: 0.3em;
-  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.5em;
+  border-bottom: 2px solid var(--border);
 }
 .report-prose h3 {
   font-size: 17px;
   font-weight: 600;
-  margin: 1.6em 0 0.4em;
+  margin: 1.8em 0 0.5em;
   line-height: 1.4;
+  padding-left: 0.6em;
+  border-left: 3px solid var(--accent);
 }
 .report-prose h4 {
   font-size: 16px;
@@ -267,4 +288,25 @@ body {
   border: none;
   border-top: 1px solid var(--border);
   margin: 2em 0;
+}
+
+/* ---- Citation links ---- */
+
+.report-prose a.citation-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+.report-prose a.citation-link:hover {
+  text-decoration: underline;
+}
+
+/* ---- Source references ---- */
+
+.report-prose .source-item {
+  margin-bottom: 0.35em;
+  padding: 0.15em 0;
+  font-size: 15px;
+  line-height: 1.6;
+  scroll-margin-top: 1em;
 }

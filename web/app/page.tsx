@@ -44,7 +44,7 @@ export default function Home() {
           />
 
           {/* Chat panel — fixed max-w-2xl, never changes size */}
-          <div className="w-full max-w-2xl shrink-0 overflow-y-auto min-h-0 px-4">
+          <div className="w-full max-w-2xl shrink-0 overflow-y-auto min-h-0 px-4" data-scroll-container>
             <div className="pt-10 pb-16 gap-4 flex flex-col">
               <ClarifyPanel query={query} onBriefReady={handleBriefReady} />
 
@@ -61,7 +61,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Report panel — fills remaining space */}
+          {/* Report panel — fills remaining space, capped for readability */}
           <div
             className={`flex-1 min-w-0 overflow-y-auto min-h-0 transition-opacity duration-500 ease-out ${
               isReport
@@ -90,7 +90,7 @@ function HeroSection({
     <div className={`flex flex-1 flex-col items-center w-full ${sending ? "hero-exit" : ""}`}>
       <div className="flex flex-1 flex-col items-center justify-center">
         <h1 className="text-4xl font-medium w-full text-center">
-          <StreamingText text="SAGE Research" mode="typewriter" speed="slow" pause={600} onComplete={() => setShowSubtitle(true)} />
+          <StreamingText text="SAGE Research" mode="typewriter" speed="slow" pause={350} onComplete={() => setShowSubtitle(true)} />
         </h1>
         <div
           className={`w-full overflow-hidden transition-all duration-1000 ease-[cubic-bezier(0.2,0.8,0.2,1)] ${

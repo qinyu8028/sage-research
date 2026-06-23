@@ -42,12 +42,18 @@ function Typewriter({
   pause?: number;
   onComplete?: () => void;
 }) {
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(-1);
   const [done, setDone] = useState(false);
   const called = useRef(false);
   const slow = speed === "slow";
 
   useEffect(() => {
+    const timer = setTimeout(() => setIndex(0), 200);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (index < 0) return;
     if (index >= text.length) {
       const wait = pause ?? 0;
       const timer = setTimeout(() => {
@@ -66,8 +72,8 @@ function Typewriter({
 
   return (
     <span>
-      {text.slice(0, index)}
-      {!done && <span className="caret" />}
+      {index > 0 && text.slice(0, index)}
+      <span className="caret" style={done ? { visibility: "hidden" } : undefined} />
     </span>
   );
 }

@@ -63,7 +63,8 @@ export default function ResearchProgress({
   const reportRef = useRef<string | null>(null);
   const statsRef = useRef<ResearchStats | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const prevLenRef = useRef(0);
+  const scrollParentRef = useRef<HTMLElement | null>(null);
+  const shouldAutoScrollRef = useRef(true);
 
   useEffect(() => {
     const abort = startResearch(brief, (event: ResearchEvent) => {
@@ -200,13 +201,24 @@ export default function ResearchProgress({
   }, [brief]);
 
   useEffect(() => {
-    if (nodes.length > prevLenRef.current) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
-    prevLenRef.current = nodes.length;
-  }, [nodes]);
+    const container = bottomRef.current?.closest("[data-scroll-container]") as HTMLElement | null;
+    if (!container) return;
+    scrollParentRef.current = container;
 
-  const visibleStart = Math.max(0, nodes.length - 2);
+    const onScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      shouldAutoScrollRef.current = scrollHeight - scrollTop - clientHeight < 80;
+    };
+
+    container.addEventListener("scroll", onScroll, { passive: true });
+    return () => container.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (shouldAutoScrollRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+  }, [nodes]);
 
   // compute "current round" per node kind
   let lastResearchIdx = -1;
@@ -256,7 +268,7 @@ export default function ResearchProgress({
       const topAfter = nodeEl.getBoundingClientRect().top;
       const delta = topAfter - topBefore;
       if (Math.abs(delta) > 1) {
-        window.scrollBy(0, delta);
+        (scrollParentRef.current ?? window).scrollBy(0, delta);
       }
     }
   }
@@ -285,7 +297,27 @@ export default function ResearchProgress({
 
         {nodes.map((node, i) => {
           const isLatest = i === nodes.length - 1;
-          const autoCollapsed = i < visibleStart;
+
+          if (node.kind === "write") {
+            return (
+              <div key={i} data-node-idx={i} className="relative pb-4 last:pb-0 bubble-enter">
+                <TimelineDot active={isLatest} />
+                <NodeBubble>
+                  <div className="flex items-center gap-1.5">
+                    <span className="p-1 -ml-1 shrink-0"><span className="block w-3.5 h-3.5" /></span>
+                    <span className="text-[14px] font-medium">{nodeLabel(node)}</span>
+                  </div>
+                  {!node.done && (
+                    <div className="mt-2">
+                      <StreamingText text="正在撰写研究报告" mode="dots" />
+                    </div>
+                  )}
+                </NodeBubble>
+              </div>
+            );
+          }
+
+          const autoCollapsed = node.kind === "plan" && !isLatest;
           const isExpanded = autoCollapsed ? expandedSet.has(i) : !expandedSet.has(i);
 
           return (
@@ -334,8 +366,9 @@ export default function ResearchProgress({
                         node={node}
                         index={i}
                         isCurrentRound={
-                          (node.kind === "research" && i === lastResearchIdx) ||
-                          (node.kind === "review" && i === lastReviewIdx)
+                          node.kind === "research"
+                            ? !nodes.slice(i + 1).some((n) => n.kind === "review" || n.kind === "write")
+                            : node.kind === "review" && i === lastReviewIdx
                         }
                         questionLabels={questionLabels}
                         expandedSubs={expandedSubs}
@@ -740,5 +773,5 @@ function formatToolUsage(tool_call_counts: Record<string, number>): string | nul
       return count > 1 ? `${label} ×${count}` : label;
     });
   if (parts.length === 0) return null;
-  return parts.join("、");
+  return "调用了 " + parts.join("、");
 }

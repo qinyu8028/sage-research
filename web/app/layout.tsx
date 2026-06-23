@@ -30,7 +30,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh" className={`${geistMono.variable} ${jetbrainsMono.variable} ${ibmPlexMono.variable} h-full`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="h-full overflow-hidden flex flex-col">{children}</body>
     </html>
   );
 }

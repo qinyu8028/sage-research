@@ -8,12 +8,19 @@ type ChatMsg =
   | { role: "user"; content: string }
   | { role: "assistant"; content: string; animate?: "word-fade" | "typewriter" }
   | { role: "assistant-loading"; content: string }
-  | { role: "assistant-directions"; message: string; directions: string[] };
+  | { role: "assistant-directions"; message: string; directions: string[] }
+  | { role: "assistant-brief"; content: string };
 
 let msgId = 0;
 function nextId() {
   return ++msgId;
 }
+
+let _clarifyCache: {
+  query: string;
+  messages: (ChatMsg & { id: number })[];
+  settled: boolean;
+} | null = null;
 
 export default function ClarifyPanel({
   query,
@@ -22,19 +29,36 @@ export default function ClarifyPanel({
   query: string;
   onBriefReady: (brief: string) => void;
 }) {
-  const [messages, setMessages] = useState<(ChatMsg & { id: number })[]>([
-    { id: nextId(), role: "user", content: query },
-    { id: nextId(), role: "assistant-loading", content: "正在分析问题..." },
-  ]);
+  const hit = _clarifyCache?.query === query ? _clarifyCache : null;
+
+  const [messages, setMessages] = useState<(ChatMsg & { id: number })[]>(
+    () =>
+      hit?.messages ?? [
+        { id: nextId(), role: "user", content: query.trim() },
+        { id: nextId(), role: "assistant-loading", content: "正在分析问题..." },
+      ],
+  );
   const [customInput, setCustomInput] = useState("");
-  const [settled, setSettled] = useState(false);
+  const [settled, setSettled] = useState(() => hit?.settled ?? false);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const [inputFlash, setInputFlash] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
+    _clarifyCache = { query, messages, settled };
+  });
+
+  useEffect(() => {
+    if (hit) return;
+
+    let cancelled = false;
     clarify(query).then((data) => {
+      if (cancelled) return;
       if (data.is_clear && data.brief) {
+        setMessages((prev) => [
+          prev[0],
+          { id: nextId(), role: "assistant-brief", content: data.brief },
+        ]);
         onBriefReady(data.brief);
       } else {
         setMessages((prev) => [
@@ -48,6 +72,9 @@ export default function ClarifyPanel({
         ]);
       }
     });
+    return () => {
+      cancelled = true;
+    };
   }, [query]);
 
   function handleCardClick(direction: string) {
@@ -84,14 +111,14 @@ export default function ClarifyPanel({
     setMessages((prev) => [
       ...prev,
       { id: userMsgId, role: "user", content: trimmed },
-      { id: loadingMsgId, role: "assistant-loading", content: "正在生成研究方案..." },
+      { id: loadingMsgId, role: "assistant-loading", content: "收到，正在整理研究方案..." },
     ]);
     refine(query, trimmed).then((data) => {
       setMessages((prev) => [
         ...prev.slice(0, -1),
-        { id: nextId(), role: "assistant", content: data.brief, animate: "typewriter" },
+        { id: nextId(), role: "assistant-brief", content: data.brief },
       ]);
-      setTimeout(() => onBriefReady(data.brief), 2000);
+      setTimeout(() => onBriefReady(data.brief), 2500);
     });
   }
 
@@ -126,7 +153,7 @@ export default function ClarifyPanel({
         if (msg.role === "assistant-directions") {
           return (
             <AssistantMsg key={msg.id}>
-              <p className="text-[15px] leading-relaxed mb-4">
+              <p className={`text-[15px] leading-relaxed ${!settled ? "mb-4" : ""}`}>
                 <StreamingText text={msg.message} mode="word-fade" />
               </p>
               {!settled && (
@@ -212,6 +239,18 @@ export default function ClarifyPanel({
             </AssistantMsg>
           );
         }
+        if (msg.role === "assistant-brief") {
+          return (
+            <AssistantMsg key={msg.id}>
+              <p className="text-[15px] leading-relaxed">
+                <StreamingText text="好的，研究方向已确认，即将开始研究：" mode="word-fade" />
+              </p>
+              <p className="text-[15px] leading-relaxed mt-1.5 text-foreground/70">
+                {msg.content}
+              </p>
+            </AssistantMsg>
+          );
+        }
         if (msg.role === "assistant") {
           return (
             <AssistantMsg key={msg.id}>
@@ -232,8 +271,8 @@ export default function ClarifyPanel({
 function UserBubble({ text }: { text: string }) {
   return (
     <div className="flex justify-end bubble-enter">
-      <div className="bg-foreground/85 text-surface px-4 py-2.5 rounded-2xl rounded-br-sm max-w-[84%] text-[14px] leading-snug">
-        {text}
+      <div className="bg-foreground/85 text-surface px-4 py-2.5 rounded-2xl rounded-br-sm max-w-[84%] text-[14px] leading-snug whitespace-pre-wrap">
+        {text.trim()}
       </div>
     </div>
   );
