@@ -14,13 +14,15 @@ class Writer(AgentBase):
     """研究流水线的最终阶段，将多条研究笔记合成为一篇结构化的 Markdown 报告。"""
 
     def __init__(
-        self, 
-        llm: llm_client, 
-        context_builder: ContextBuilder, 
+        self,
+        llm: llm_client,
+        context_builder: ContextBuilder,
         name: str = "writer",
         system_prompt: str = WRITER_SYSTEM_PROMPT,
+        temperature: float = 0,
     ):
         super().__init__(name, llm, context_builder, system_prompt)
+        self.temperature = temperature
 
     def run(self, research_brief: str, notes: list[str]) -> str:
         """接收研究简报和已审查通过的研究笔记，单次 LLM 调用生成最终报告。"""
@@ -41,6 +43,7 @@ class Writer(AgentBase):
         writer_response = self.llm.invoke(
             messages=messages,
             max_tokens=16384,
+            temperature=self.temperature,
             tag="writer",
         )
 

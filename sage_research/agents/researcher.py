@@ -35,9 +35,11 @@ class Researcher(AgentBase):
         tool_list: list[BaseTool],
         max_steps: int = 3,
         system_prompt: str = RESEARCHER_SYSTEM_PROMPT,
+        temperature: float = 0,
     ):
         super().__init__(name, llm, context_builder, system_prompt)
         self.max_steps = max_steps
+        self.temperature = temperature
         self.tool_schema = [tool.to_schema() for tool in tool_list]
         self._tool_map = {tool.name: tool for tool in tool_list}
 
@@ -62,6 +64,7 @@ class Researcher(AgentBase):
             response = self.llm.invoke(
                 messages=messages,
                 tools=self.tool_schema,
+                temperature=self.temperature,
                 tag=f"{self.name}:react",
             )
 
@@ -118,6 +121,7 @@ class Researcher(AgentBase):
             messages = self._build_messages(self.system_prompt)
             response = self.llm.invoke(
                 messages=messages,
+                temperature=self.temperature,
                 tag=f"{self.name}:forced_summary",
             )
             response_msg = Message(role="assistant", content=response.content)
@@ -143,6 +147,7 @@ class Researcher(AgentBase):
         ]
         compress_response = self.llm.invoke(
             messages=messages,
+            temperature=self.temperature,
             tag=f"{self.name}:compress",
         )
         
@@ -231,6 +236,7 @@ class Researcher(AgentBase):
         ]
         denoise_response = self.llm.invoke(
             messages=messages,
+            temperature=self.temperature,
             tag=f"{self.name}:denoise",
         )
         return denoise_response.content

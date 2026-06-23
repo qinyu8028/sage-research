@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 class LLMConfig:
     model: str = os.getenv("LLM_MODEL_ID", "GLM-4-Flash")
     temperature: float = 0.0
+    research_temperature: float = 0.6
     timeout: int = 120
 
 
