@@ -45,9 +45,8 @@ export interface SaveReportResult {
 
 export async function saveReport(title: string, content: string): Promise<SaveReportResult> {
   if (MOCK) {
-    return new Promise((resolve) => {
-      setTimeout(() => resolve({ title, status: "created" }), 500);
-    });
+    const { mockSaveReport } = await import("./mock");
+    return mockSaveReport(title);
   }
   const res = await fetch(`${API_BASE}/api/library/save-report`, {
     method: "POST",
@@ -65,9 +64,34 @@ export interface LibraryDoc {
 
 export async function listDocs(): Promise<LibraryDoc[]> {
   if (MOCK) {
-    return [];
+    const { mockListDocs } = await import("./mock");
+    return mockListDocs();
   }
   const res = await fetch(`${API_BASE}/api/library`);
+  return res.json();
+}
+
+export async function deleteDoc(title: string): Promise<void> {
+  if (MOCK) {
+    const { mockDeleteDoc } = await import("./mock");
+    return mockDeleteDoc(title);
+  }
+  await fetch(`${API_BASE}/api/library/${encodeURIComponent(title)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function uploadFile(file: File): Promise<SaveReportResult> {
+  if (MOCK) {
+    const { mockUploadFile } = await import("./mock");
+    return mockUploadFile(file);
+  }
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API_BASE}/api/library/upload`, {
+    method: "POST",
+    body: form,
+  });
   return res.json();
 }
 

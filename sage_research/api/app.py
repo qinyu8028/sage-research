@@ -4,7 +4,7 @@ import os
 import tempfile
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
@@ -89,6 +89,23 @@ def save_report(body: SaveReportRequest, request: Request) -> IngestResult:
         result = library_manager.ingest(
             src=tmp.name, custom_title=body.title, overwrite=True
         )
+    finally:
+        if os.path.exists(tmp.name):
+            os.unlink(tmp.name)
+    return result
+
+
+@app.post("/api/library/upload")
+def upload_file(file: UploadFile, request: Request) -> IngestResult:
+    library_manager: LibraryManager = request.app.state.library_manager
+    suffix = os.path.splitext(file.filename or "upload")[1] or ".pdf"
+    tmp = tempfile.NamedTemporaryFile(
+        delete=False, suffix=suffix, dir=library_manager.data_dir,
+    )
+    try:
+        tmp.write(file.file.read())
+        tmp.close()
+        result = library_manager.ingest(src=tmp.name, overwrite=True)
     finally:
         if os.path.exists(tmp.name):
             os.unlink(tmp.name)

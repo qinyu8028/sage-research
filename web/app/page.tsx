@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import QueryInput from "@/components/QueryInput";
+import LibraryDrawer from "@/components/LibraryDrawer";
 import ClarifyPanel, { resetClarifyCache } from "@/components/ClarifyPanel";
 import ResearchProgress from "@/components/ResearchProgress";
 import ReportView from "@/components/ReportView";
@@ -43,9 +44,12 @@ export default function Home() {
   return (
     <>
       {(stage === "input" || stage === "sending") && (
-        <div className="flex flex-1 flex-col items-center px-4">
-          <HeroSection onSubmit={handleQuerySubmit} sending={stage === "sending"} />
-        </div>
+        <>
+          <LibraryDrawer />
+          <div className="flex flex-1 flex-col items-center px-4">
+            <HeroSection onSubmit={handleQuerySubmit} sending={stage === "sending"} />
+          </div>
+        </>
       )}
 
       {stage !== "input" && stage !== "sending" && (
@@ -74,7 +78,7 @@ export default function Home() {
                 返回
               </button>
             </div>
-            <div className="pb-16 gap-4 flex flex-col">
+            <div className="pb-8 gap-4 flex flex-col items-center">
               <ClarifyPanel query={query} onBriefReady={handleBriefReady} />
 
               {(stage === "researching" || isReport) && (

@@ -1,7 +1,7 @@
 // Mock SSE events — simulate full research pipeline without backend.
 // Enable via NEXT_PUBLIC_MOCK=true env var, or `npm run dev:mock`.
 
-import type { ClarifyResult, RefineResult, ResearchEvent } from "./api";
+import type { ClarifyResult, RefineResult, ResearchEvent, LibraryDoc, SaveReportResult } from "./api";
 
 const MOCK_BRIEF = "对比 Transformer、Mamba 和 RWKV 三种架构在长文本建模任务上的效率与性能";
 
@@ -223,4 +223,44 @@ export function startMockResearch(
     _mockRunning = false;
     timers.forEach(clearTimeout);
   };
+}
+
+// --- Mock library ---
+
+const _mockDocs: LibraryDoc[] = [
+  { title: "Attention Is All You Need", source_type: "arxiv", added_at: "2026-06-20T14:30:00Z" },
+  { title: "Mamba: Linear-Time Sequence Modeling with Selective State Spaces", source_type: "arxiv", added_at: "2026-06-21T09:15:00Z" },
+];
+
+export function mockListDocs(): Promise<LibraryDoc[]> {
+  return new Promise((resolve) => setTimeout(() => resolve([..._mockDocs]), 300));
+}
+
+export function mockDeleteDoc(title: string): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const idx = _mockDocs.findIndex((d) => d.title === title);
+      if (idx !== -1) _mockDocs.splice(idx, 1);
+      resolve();
+    }, 300);
+  });
+}
+
+export function mockSaveReport(title: string): Promise<SaveReportResult> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      _mockDocs.unshift({ title, source_type: "report", added_at: new Date().toISOString() });
+      resolve({ title, status: "created" });
+    }, 500);
+  });
+}
+
+export function mockUploadFile(file: File): Promise<SaveReportResult> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const title = file.name.replace(/\.[^.]+$/, "");
+      _mockDocs.unshift({ title, source_type: "upload", added_at: new Date().toISOString() });
+      resolve({ title, status: "created" });
+    }, 500);
+  });
 }
