@@ -49,6 +49,7 @@ export default function ClarifyPanel({
   const [revealDirections, setRevealDirections] = useState(!!hit);
   const [revealBrief, setRevealBrief] = useState(!!hit);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const pendingBriefRef = useRef<string | null>(null);
 
   useEffect(() => {
     _clarifyCache = { query, messages, settled };
@@ -62,11 +63,11 @@ export default function ClarifyPanel({
       if (cancelled) return;
       if (data.is_clear && data.brief) {
         const brief = data.brief;
+        pendingBriefRef.current = brief;
         setMessages((prev) => [
           prev[0],
           { id: nextId(), role: "assistant-brief", content: brief },
         ]);
-        onBriefReady(brief);
       } else {
         setMessages((prev) => [
           prev[0],
@@ -122,11 +123,11 @@ export default function ClarifyPanel({
       { id: loadingMsgId, role: "assistant-loading", content: "收到，正在整理研究方案..." },
     ]);
     refine(query, trimmed).then((data) => {
+      pendingBriefRef.current = data.brief;
       setMessages((prev) => [
         ...prev.slice(0, -1),
         { id: nextId(), role: "assistant-brief", content: data.brief },
       ]);
-      setTimeout(() => onBriefReady(data.brief), 2500);
     });
   }
 
@@ -255,7 +256,16 @@ export default function ClarifyPanel({
               </p>
               {revealBrief && (
                 <p className="text-[15px] leading-relaxed mt-1.5 text-foreground/70">
-                  <StreamingText text={msg.content} mode="typewriter" />
+                  <StreamingText
+                    text={msg.content}
+                    mode="typewriter"
+                    onComplete={() => {
+                      if (pendingBriefRef.current) {
+                        onBriefReady(pendingBriefRef.current);
+                        pendingBriefRef.current = null;
+                      }
+                    }}
+                  />
                 </p>
               )}
             </AssistantMsg>
