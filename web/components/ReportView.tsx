@@ -3,7 +3,10 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import rehypeRaw from "rehype-raw";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 import { saveReport } from "@/lib/api";
 
 interface ReportViewProps {
@@ -129,11 +132,11 @@ export default function ReportView({ report, stats }: ReportViewProps) {
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10V4a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v6M5 10h14a2 2 0 0 1 2 2v3H3v-3a2 2 0 0 1 2-2z" />
             <circle cx="12" cy="15" r="1" />
           </svg>
-          下载 PDF
+          打印 PDF
         </button>
       </div>
       <article className="report-prose" onClick={handleCitationClick}>
-        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+        <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeRaw, rehypeKatex]}>
           {body}
         </ReactMarkdown>
         {sources.length > 0 && (
