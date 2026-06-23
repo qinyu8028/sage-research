@@ -44,6 +44,7 @@
 .thin-scroll {
   scrollbar-width: thin;
   scrollbar-color: rgba(0, 0, 0, 0.12) transparent;
+  scrollbar-gutter: stable;
 }
 .thin-scroll::-webkit-scrollbar { width: 4px; }
 .thin-scroll::-webkit-scrollbar-track { background: transparent; }
