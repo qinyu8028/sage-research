@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class SubQuestion(BaseModel):
+    label: str = Field(description="Short label (under 20 chars) capturing the core topic. For frontend display.")
     question: str = Field(description="The research sub-question.")
     rationale: str = Field(description="Why this sub-question deserves separate investigation.")
 
@@ -28,6 +29,7 @@ class NoteReview(BaseModel):
     depth: str = Field(default="", description="Evidence for depth criterion.")
     citations: str = Field(default="", description="Evidence for citation density criterion.")
     sources: str = Field(default="", description="Evidence for source diversity criterion.")
+    completeness: str = Field(default="", description="Evidence for completeness criterion.")
     verdict: Literal["approved", "retry", "revise"] = Field(
         description="Derived from evidence using the decision tree in instructions."
     )
@@ -35,8 +37,13 @@ class NoteReview(BaseModel):
     def failed_criteria(self) -> str:
         if self.verdict == "approved":
             return ""
-        fields = {"relevance": self.relevance, "depth": self.depth,
-                  "citations": self.citations, "sources": self.sources}
+        fields = {
+            "relevance": self.relevance,
+            "depth": self.depth,
+            "citations": self.citations,
+            "sources": self.sources,
+            "completeness": self.completeness,
+        }
         return "\n".join(f"{k}: {v}" for k, v in fields.items() if v)
 
 
@@ -67,13 +74,17 @@ class Supervisor(AgentBase):
             "type": "function",
             "function": {
                 "name": "create_research_plan",
-                "description": "Submit the research sub-questions.",
+                "description": "Analyze dimensions first, then submit research sub-questions.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "sub_questions": {"type": "array", "items": subquestion_schema}
+                        "analysis": {
+                            "type": "string",
+                            "description": "Dimension analysis and coverage planning. List all dimensions the brief spans, then explain how your sub-questions cover them without overlap. Fill this BEFORE sub_questions.",
+                        },
+                        "sub_questions": {"type": "array", "items": subquestion_schema},
                     },
-                    "required": ["sub_questions"],
+                    "required": ["analysis", "sub_questions"],
                 },
             },
         }

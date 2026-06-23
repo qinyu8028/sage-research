@@ -167,22 +167,34 @@ Review verdicts: "approved" → Writer, "retry" → same Researcher with feedbac
 SUPERVISOR_PLAN_USER = """**Phase: PLANNING**
 
 <instructions>
-1. Identify which dimensions the brief spans (theory vs practice, comparison vs survey, etc.).
-2. Decompose into 3-4 sub-questions:
+1. **Dimension analysis**: List ALL dimensions the brief spans — e.g., theory vs. practice, comparison subjects, technical vs. business, historical vs. current, advantages vs. limitations. Be exhaustive; missing a dimension here means missing it in the final report.
+2. **Coverage planning**: Using these dimensions as a checklist, design a combination of sub-questions such that:
+   - Every dimension is covered by at least one sub-question.
+   - No two sub-questions cover the same dimension from the same angle.
+   - The set collectively answers the full brief.
+3. Produce 3-5 sub-questions following these rules:
    - Self-contained: include all background/scope/context — Researcher has NO other information. At least one full paragraph.
    - Independent: can be researched in parallel.
    - Non-overlapping: minimize redundancy.
    - Collectively exhaustive: cover the full scope.
    - Focused: each Researcher has only {max_steps} search steps. A sub-question requiring 5+ distinct searches is too broad — split it.
-3. Specify what to look for: sources, aspects, evidence type. Expand acronyms on first use.
-4. Provide a rationale for each sub-question.
+4. For each sub-question, provide:
+   - **label**: keyword-level distillation of the core topic (under 20 characters). NOT a truncation of the question — extract the essence.
+   - **question**: the full, self-contained research question. Specify what to look for: sources, aspects, evidence type. Expand acronyms on first use.
+   - **rationale**: why this sub-question deserves separate investigation and which dimensions from step 1 it covers.
 </instructions>
 
 <output_format>
-MUST call `create_research_plan` tool. Entire output = single tool call. Language must match the research brief.
+MUST call `create_research_plan` tool. Entire output = single tool call. Fill fields in order:
+1. **analysis**: write your dimension analysis and coverage plan here FIRST.
+2. **sub_questions**: then list the sub-questions derived from your analysis.
+
+Before submitting, verify: no two sub-questions could produce substantially overlapping search results. If overlap exists, merge or redraw boundaries.
+
+Language must match the research brief.
 
 Fallback (only if tool call is impossible): raw JSON, no code fence:
-{{"sub_questions": [{{"question": "...", "rationale": "..."}}]}}
+{{"analysis": "...", "sub_questions": [{{"label": "...", "question": "...", "rationale": "..."}}]}}
 </output_format>
 
 <examples>
@@ -192,12 +204,14 @@ Input: "Research the current applications of large language models in the medica
 Output (via create_research_plan tool):
 [
   {{
+    "label": "Clinical diagnosis",
     "question": "Investigate how large language models (LLMs) are used for clinical diagnosis assistance in hospitals. Look for deployed systems (not just prototypes), the diseases they target, published accuracy metrics vs. human clinicians, regulatory approval status (e.g. FDA clearance), and how they integrate into clinical workflows.",
-    "rationale": "Clinical diagnosis is the most direct medical application, with unique accuracy and regulatory constraints."
+    "rationale": "Clinical diagnosis is the most direct medical application, with unique accuracy and regulatory constraints. Covers: practice, application area, performance metrics."
   }},
   {{
+    "label": "Risks & regulation",
     "question": "Investigate the major challenges and risks of deploying LLMs in medicine: hallucination and its medical consequences, patient data privacy (HIPAA), regulatory approval landscape for AI medical tools, and evidence of demographic bias in medical AI systems.",
-    "rationale": "Risks cut across all application areas. Separate investigation ensures balanced assessment."
+    "rationale": "Risks cut across all application areas. Separate investigation ensures balanced assessment. Covers: limitations, regulation, ethics."
   }}
 ]
 </example>
@@ -217,14 +231,17 @@ The previous research round identified gaps in coverage. Generate new sub-questi
 Follow the same principles as initial planning: self-contained, independent, non-overlapping, focused (each Researcher has only {max_steps} search steps).
 Focus ONLY on uncovered dimensions — do not regenerate questions for already-covered areas.
 Each new sub-question must include full context so the Researcher can work independently.
+Each sub-question needs a label (keyword-level core topic, under 20 characters).
 </instructions>
 
 <output_format>
+Before submitting, verify: no new sub-question overlaps with already-covered questions or with each other.
+
 You MUST call the `create_research_plan` tool to submit your sub-questions. Your entire output should be a single tool call — do not also repeat the content as JSON or text outside the tool call.
-All text in the tool call (question, rationale) MUST be in the same language as the research brief.
+All text in the tool call (label, question, rationale) MUST be in the same language as the research brief.
 
 Fallback (only if your interface truly cannot issue a tool call): output a single raw JSON object, no markdown code fence, no text before or after:
-{{"sub_questions": [{{"question": "...", "rationale": "..."}}]}}
+{{"sub_questions": [{{"label": "...", "question": "...", "rationale": "..."}}]}}
 </output_format>
 
 <research_brief>
@@ -253,25 +270,31 @@ SUPERVISOR_REVIEW_USER = """**Phase: REVIEW**
 You receive exactly {pair_count} (sub-question, research note) pairs below.
 
 <instructions>
-For each pair, extract evidence for 4 criteria, then derive verdict.
+For each pair, extract evidence for 5 criteria, then derive verdict.
 
 **Criterion 1 — relevance**: List which sections of the note match vs. do not match the sub-question.
 
 **Criterion 2 — depth**: Quote specific data points found (numbers, names, dates). Then quote vague phrases if any ("widely used", "promising results", etc.).
 Format: "N specific data points: [list them]. M vague claims: [quote them]."
-Rule: if M >= 3, this criterion fails.
+Rule: if M >= 2, this criterion fails.
 
 **Criterion 3 — citations**: Count factual claims in the note. Count how many have inline citations [N]. Count distinct sources in the Sources section.
 Format: "X/Y claims cited. Z sources listed."
-Rule: if X/Y < 60% OR Z < 3, this criterion fails.
+Rule: if X/Y < 75% OR Z < 3, this criterion fails.
 
 **Criterion 4 — sources**: List each distinct source and how many times it is cited.
 Format: "N distinct sources: [1] Name (K cites), [2] Name (K cites), ..."
 Rule: if N < 3 OR one source has >50% of all citations, this criterion fails.
 
+**Criterion 5 — completeness**: Decompose the sub-question into its constituent aspects (what specific points does it ask about?). For each aspect, state whether the note covers it with specific data, or misses it.
+Format: "K/N aspects covered. Covered: [aspect → data cited]. Missing: [aspect list]."
+Rule: if K/N < 75%, this criterion fails.
+This is the most important criterion — a note can be relevant, deep, well-cited, and multi-source, yet still miss half the question. Only approve when coverage is substantial.
+
 **Verdict decision tree (apply strictly to your own evidence above):**
-- All 4 criteria pass → "approved"
-- Only sources fails, other 3 pass → "approved"
+- All 5 criteria pass → "approved"
+- Only sources fails, completeness passes → "approved"
+- Only sources fails, completeness fails → "retry"
 - relevance fails → "revise"
 - Any other failure → "retry"
 
@@ -281,11 +304,12 @@ After all pairs: is any important dimension of the research brief completely abs
 <output_format>
 MUST call `submit_review` tool. Exactly {pair_count} reviews in note_reviews, same order as input.
 
-Each review has 5 fields:
+Each review has 6 fields:
 - relevance: evidence string (which sections match the sub-question)
 - depth: evidence string ("N specific data points: ... M vague claims: ...")
 - citations: evidence string ("X/Y claims cited. Z sources listed.")
 - sources: evidence string ("N distinct sources: ...")
+- completeness: evidence string ("K/N aspects covered. Covered: [...]. Missing: [...]")
 - verdict: "approved", "retry", or "revise" — derived from evidence above
 
 All evidence fields MUST be non-empty. Verdict MUST be consistent with the numbers in your evidence.
@@ -294,7 +318,7 @@ Verify before submitting: note_reviews count == {pair_count}, order matches inpu
 Language must match research brief.
 
 Fallback: raw JSON, no code fence:
-{{"note_reviews": [{{"relevance": "...", "depth": "...", "citations": "...", "sources": "...", "verdict": "approved"}}], "missing_dimensions": ""}}
+{{"note_reviews": [{{"relevance": "...", "depth": "...", "citations": "...", "sources": "...", "completeness": "...", "verdict": "approved"}}], "missing_dimensions": ""}}
 </output_format>
 
 <examples>
@@ -304,7 +328,7 @@ Brief: "Compare RAG and fine-tuning for enterprise knowledge management"
 <sub_question>What are the computational costs and infrastructure requirements of RAG vs fine-tuning?</sub_question>
 <research_note>## Cost Analysis\n- RAG: embedding 1M docs costs $5-50 via OpenAI API; retrieval adds 50-200ms latency per query [1]. Vector DB (Pinecone/Weaviate) $70-200/month for 1M vectors [2].\n- Fine-tuning: GPT-3.5 at $0.008/1K tokens, 100K examples ≈ $800 [3]; LLaMA-7B full FT needs 2×A100 80GB, ~$50/run on Lambda Cloud [4].\n- LoRA: same LLaMA-7B on 1×RTX 4090, ~$2/run, 3x faster convergence [4][5].\n- Break-even: RAG cheaper below 10K queries/month; fine-tuning amortizes above that [1][3].\nSources: [1] LangChain cost analysis 2024, [2] Pinecone pricing docs, [3] OpenAI fine-tuning guide, [4] Anyscale LLaMA benchmark, [5] Hu et al. LoRA paper</research_note>
 </pair>
-Output: {{"note_reviews": [{{"relevance": "All sections cover costs and infrastructure: embedding costs, vector DB pricing, fine-tuning compute, LoRA comparison, break-even analysis", "depth": "8 specific data points: $5-50, $70-200/month, $0.008/1K tokens, $800, 2xA100 80GB, $50/run, $2/run, 50-200ms. 0 vague claims.", "citations": "6/6 claims cited. 5 sources listed.", "sources": "5 distinct sources: [1] LangChain (2 cites), [2] Pinecone (1), [3] OpenAI (2), [4] Anyscale (2), [5] Hu et al. (1)", "verdict": "approved"}}], "missing_dimensions": ""}}
+Output: {{"note_reviews": [{{"relevance": "All sections cover costs and infrastructure: embedding costs, vector DB pricing, fine-tuning compute, LoRA comparison, break-even analysis", "depth": "8 specific data points: $5-50, $70-200/month, $0.008/1K tokens, $800, 2xA100 80GB, $50/run, $2/run, 50-200ms. 0 vague claims.", "citations": "6/6 claims cited. 5 sources listed. → 100% >= 75%, PASS", "sources": "5 distinct sources: [1] LangChain (2 cites), [2] Pinecone (1), [3] OpenAI (2), [4] Anyscale (2), [5] Hu et al. (1)", "completeness": "3/3 aspects covered. Covered: RAG costs → $5-50 embedding + $70-200/month DB [1][2]; Fine-tuning costs → $800 GPT-3.5 + $50 LLaMA full FT [3][4]; Infrastructure requirements → 2×A100 vs 1×RTX 4090, LoRA 3x faster [4][5]. Missing: none.", "verdict": "approved"}}], "missing_dimensions": ""}}
 </example>
 
 <example name="single_source_retry">
@@ -313,7 +337,7 @@ Brief: "Compare RAG and fine-tuning for enterprise knowledge management"
 <sub_question>How does fine-tuning work for enterprise knowledge management?</sub_question>
 <research_note>## Fine-tuning for Enterprise KM\n- Full fine-tuning updates all model parameters. For LLaMA-2 7B, this requires ~60GB VRAM [1]. Optimizer states (Adam) consume 12-14 bytes per parameter [1].\n- LoRA reduces trainable parameters by 99%+. Rank 8 on 7B model: 4.19M trainable params (0.062%) [1]. QLoRA adds INT4 quantization, reducing memory to ~13GB [1].\n- Bloomberg fine-tuned a 50B model on financial data — BloombergGPT showed strong domain performance [1].\n- Enterprise challenges: data curation is expensive, compliance constraints limit training data scope [1].\n- Catastrophic forgetting: fine-tuned models may lose general capabilities [1].\nSources: [1] Anyscale blog: Fine-tuning LLMs with LoRA</research_note>
 </pair>
-Output: {{"note_reviews": [{{"relevance": "Covers fine-tuning mechanisms, LoRA/QLoRA, BloombergGPT case, enterprise challenges — all relevant", "depth": "5 specific data points: 60GB VRAM, 12-14 bytes/param, 4.19M params (0.062%), 13GB QLoRA, 50B model. 0 vague claims.", "citations": "6/6 claims cited. 1 source listed. → 1 < 3, FAIL", "sources": "1 distinct source: [1] Anyscale blog (6 cites). → 1 < 3, FAIL", "verdict": "retry"}}], "missing_dimensions": ""}}
+Output: {{"note_reviews": [{{"relevance": "Covers fine-tuning mechanisms, LoRA/QLoRA, BloombergGPT case, enterprise challenges — all relevant", "depth": "5 specific data points: 60GB VRAM, 12-14 bytes/param, 4.19M params (0.062%), 13GB QLoRA, 50B model. 0 vague claims.", "citations": "6/6 claims cited. 1 source listed. → 1 < 3, FAIL", "sources": "1 distinct source: [1] Anyscale blog (6 cites). → 1 < 3, FAIL", "completeness": "2/3 aspects covered. Covered: fine-tuning mechanics → full FT + LoRA/QLoRA details [1]; enterprise challenges → data curation + compliance [1]. Missing: enterprise-specific adoption cases beyond BloombergGPT, practical deployment workflow.", "verdict": "retry"}}], "missing_dimensions": ""}}
 </example>
 
 <example name="vague_content_retry">
@@ -322,7 +346,16 @@ Brief: "Compare RAG and fine-tuning for enterprise knowledge management"
 <sub_question>What are the performance trade-offs between RAG and fine-tuning?</sub_question>
 <research_note>## Performance Comparison\n- RAG systems achieve good results on knowledge-intensive tasks. They are widely adopted in enterprise settings.\n- Fine-tuning produces more specialized models. LoRA is a popular approach that shows promising results.\n- RAG has the advantage of real-time knowledge updates. Fine-tuning requires retraining.\n- Both approaches have their strengths and weaknesses depending on the use case.\n- Recent research suggests hybrid approaches may combine the best of both worlds.\nSources: [1] General LLM survey 2024</research_note>
 </pair>
-Output: {{"note_reviews": [{{"relevance": "Discusses RAG vs fine-tuning performance — topic matches sub-question", "depth": "0 specific data points. 5 vague claims: 'good results', 'widely adopted', 'promising results', 'strengths and weaknesses', 'best of both worlds'. → 5 >= 3, FAIL", "citations": "0/5 claims cited. 1 source listed. → 0% < 60%, FAIL", "sources": "1 distinct source: [1] General LLM survey 2024 (0 cites in text). → 1 < 3, FAIL", "verdict": "retry"}}], "missing_dimensions": ""}}
+Output: {{"note_reviews": [{{"relevance": "Discusses RAG vs fine-tuning performance — topic matches sub-question", "depth": "0 specific data points. 5 vague claims: 'good results', 'widely adopted', 'promising results', 'strengths and weaknesses', 'best of both worlds'. → 5 >= 2, FAIL", "citations": "0/5 claims cited. 1 source listed. → 0% < 75%, FAIL", "sources": "1 distinct source: [1] General LLM survey 2024 (0 cites in text). → 1 < 3, FAIL", "completeness": "1/4 aspects covered. Covered: general comparison → mentions both have trade-offs (vague). Missing: specific accuracy benchmarks, latency comparison, knowledge update cadence trade-off, cost-per-query trade-off.", "verdict": "retry"}}], "missing_dimensions": ""}}
+</example>
+
+<example name="partial_coverage_retry">
+Brief: "Evaluate the safety and efficacy of mRNA vaccines for COVID-19"
+<pair>
+<sub_question>What are the short-term and long-term side effects of mRNA COVID-19 vaccines, and how do they compare to traditional vaccines?</sub_question>
+<research_note>## mRNA Vaccine Side Effects\n- Common short-term effects: injection site pain (84% Pfizer, 76% Moderna), fatigue (63%, 68%), headache (55%, 59%), muscle pain (38%, 45%) [1].\n- Severe allergic reactions (anaphylaxis): 2.5-4.7 cases per million doses, comparable to other vaccines [1][2].\n- Myocarditis risk: elevated in young males (16-24) after second dose — 13.3 cases per 100K for Moderna, 9.8 for Pfizer [2]. Most cases mild, resolved within days.\n- No long-term safety signals identified in 2-year follow-up studies covering 6.2 million participants [2].\nSources: [1] CDC VAERS surveillance report 2023, [2] JAMA network study: mRNA vaccine safety meta-analysis 2024</research_note>
+</pair>
+Output: {{"note_reviews": [{{"relevance": "All sections discuss side effects — directly on topic", "depth": "7 specific data points: 84%, 76%, 63%, 68%, 2.5-4.7/million, 13.3/100K, 9.8/100K, 6.2M participants. 0 vague claims.", "citations": "7/7 claims cited. 2 sources listed. → 2 < 3, FAIL", "sources": "2 distinct sources: [1] CDC VAERS (3 cites), [2] JAMA (4 cites). → 2 < 3, FAIL", "completeness": "2/4 aspects covered. Covered: short-term side effects → detailed rates [1]; long-term safety → 2-year follow-up data [2]. Missing: comparison to traditional vaccines (no traditional vaccine side effect data provided), efficacy data (sub-question asks for safety AND efficacy — no efficacy discussed).", "verdict": "retry"}}], "missing_dimensions": ""}}
 </example>
 
 Note: Examples in English. Your output language must match the research brief's language.
@@ -372,7 +405,7 @@ Prefer low-cost tools when they can provide the facts you need. Only use high-co
    a) Relevance check:
       - 0-1 out of 5 results on-topic → query mismatch. Refine: add domain terms, alternative phrasings, narrow scope.
       - 2+ out of 5 on-topic → usable. Check whether snippets contain the specific data you need.
-      - After any high-cost tool call (fetch/read), verify the content is relevant. If off-topic, discard it and try a different source — do not extract from irrelevant content.
+      - After any high-cost tool call (full-page fetch or paper read), verify the content is relevant. If off-topic, discard it and try a different source — do not extract from irrelevant content.
 
    b) Selective deepening — use a high-cost tool ONLY when all three conditions are met:
       1. The snippet is clearly relevant to your sub-question
@@ -416,15 +449,15 @@ Good (cost-conscious):
 1. rag_search("RAG hallucination reduction") → empty
 2. search("reduce hallucination RAG 2024") → 4/5 on-topic, mentions CRAG paper + survey URL
    Sufficiency: snippets name techniques but lack mechanisms/data → need detail
-3. fetch survey URL → 8 techniques with descriptions, Self-RAG (retrieve-critique-generate, F1 +5.7%), FLARE
+3. mcp__fetch__fetch survey URL → 8 techniques with descriptions, Self-RAG (retrieve-critique-generate, F1 +5.7%), FLARE
    Sufficiency: concrete mechanism + metric for Self-RAG, breadth from survey → sufficient
 Result: 8 techniques cataloged, 1 with depth, cross-referenced. 3 tool calls.
 
 Bad (wasteful):
 1. search("RAG hallucination") → snippets mention 3 URLs
-2. fetch URL 1 → long article, partially relevant
-3. fetch URL 2 → overlapping info
-4. fetch URL 3 → diminishing returns
+2. mcp__fetch__fetch URL 1 → long article, partially relevant
+3. mcp__fetch__fetch URL 2 → overlapping info
+4. mcp__fetch__fetch URL 3 → diminishing returns
 Result: same information, 4x the cost
 </example_strategy>
 </examples>
