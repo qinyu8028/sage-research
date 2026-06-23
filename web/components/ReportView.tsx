@@ -25,17 +25,27 @@ interface ProcessedReport {
   sources: SourceItem[];
 }
 
+function sanitizeMathDollars(text: string): string {
+  // 转义后跟数字的 $（货币符号如 $100），防止 remark-math 将其当作 LaTeX 分隔符
+  // 不影响 $x^2$ 这种真正的数学公式（$ 后跟字母）
+  return text.replace(/\$(?=\d)/g, "\\$");
+}
+
 function processReport(raw: string): ProcessedReport {
   const headingMatch = raw.match(
     /^(#{1,3})\s*(Sources|References|参考文献)\s*$/m,
   );
   if (!headingMatch) {
-    return { body: raw, sourcesHeading: "", sources: [] };
+    return {
+      body: sanitizeMathDollars(raw),
+      sourcesHeading: "",
+      sources: [],
+    };
   }
 
   const heading = headingMatch[0];
   const splitIdx = headingMatch.index!;
-  const body = raw.slice(0, splitIdx);
+  const body = sanitizeMathDollars(raw.slice(0, splitIdx));
   const sourcesText = raw.slice(splitIdx + heading.length).trim();
 
   const processedBody = body.replace(
