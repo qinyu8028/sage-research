@@ -84,7 +84,8 @@ def save_report(body: SaveReportRequest, request: Request) -> IngestResult:
         with open(src, "w", encoding="utf-8") as f:
             f.write(body.content)
         result = library_manager.ingest(
-            src=src, custom_title=body.title, overwrite=True
+            src=src, custom_title=body.title, overwrite=True,
+            save_original=False,
         )
     finally:
         if os.path.exists(src):

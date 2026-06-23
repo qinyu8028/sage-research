@@ -31,7 +31,8 @@ class LibraryManager:
         os.makedirs(self.converted_dir, exist_ok=True)
 
     def ingest(
-        self, src: str, custom_title: str = None, overwrite: bool = True
+        self, src: str, custom_title: str = None, overwrite: bool = True,
+        save_original: bool = True,
     ) -> IngestResult:
 
         entries = self.list_docs()
@@ -73,28 +74,29 @@ class LibraryManager:
         else:
             status = "created"
 
-        if arxiv_match:
-            pdf_src = os.path.join(self.paper_tool.download_dir, f"{src}.pdf")
-            if os.path.exists(pdf_src):
-                shutil.copy(pdf_src, self.originals_dir)
-        else:
-            shutil.copy(src, self.originals_dir)
+        if save_original:
+            if arxiv_match:
+                pdf_src = os.path.join(self.paper_tool.download_dir, f"{src}.pdf")
+                if os.path.exists(pdf_src):
+                    shutil.copy(pdf_src, self.originals_dir)
+            else:
+                shutil.copy(src, self.originals_dir)
 
         self.pipeline.add_document(metadata.output_path, save=False)
-
-        if arxiv_match:
-            original_path = os.path.join(self.originals_dir, f"{src}.pdf")
-        else:
-            original_path = os.path.join(self.originals_dir, os.path.basename(src))
 
         index_entry_dict = {
             "title": metadata.title,
             "arxiv_id": metadata.arxiv_id,
-            "original_path": original_path,
             "converted_path": metadata.output_path,
             "source_type": metadata.source_type,
             "added_at": datetime.now().isoformat()
         }
+        if save_original:
+            if arxiv_match:
+                original_path = os.path.join(self.originals_dir, f"{src}.pdf")
+            else:
+                original_path = os.path.join(self.originals_dir, os.path.basename(src))
+            index_entry_dict["original_path"] = original_path
         entries.append(index_entry_dict)
 
         self._save_index(entries)
