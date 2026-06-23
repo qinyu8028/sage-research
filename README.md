@@ -22,7 +22,7 @@ searches across web and academic sources in parallel, and synthesizes structured
 ## Architecture
 
 ```
-            User Query
+        User Query
             │
             ▼
             ┌───────────┐   unclear    ┌─────────────────┐
