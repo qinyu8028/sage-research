@@ -26,7 +26,7 @@ def merge_dicts(a: dict, b: dict) -> dict:
 class State(TypedDict):
     research_brief: str
     sub_questions: list[SubQuestion]
-    review_result: ReviewResult
+    review_result: dict
     approved_pairs: Annotated[list[tuple[str, str]], operator.add]
     pending_review_pairs: Annotated[list[tuple[str, str]], pending_review_reducer]
     refine_round: int
@@ -75,26 +75,29 @@ def build_graph(
             logger.info("[Graph] route: 超过最大轮数 %d, 进入 write", max_rounds)
             return "write_node"
 
-        verdicts = {note_review.verdict for note_review in state["review_result"].note_reviews}
+        review = state["review_result"]
+        verdicts = {nr["verdict"] for nr in review["note_reviews"]}
 
-        if verdicts == {"approved"} and not state["review_result"].missing_dimensions:
+        if verdicts == {"approved"} and not review.get("missing_dimensions"):
             logger.info("[Graph] route: 全部通过, 进入 write")
             return "write_node"
 
-        if verdicts <= {"approved", "retry"} and not state["review_result"].missing_dimensions:
+        if verdicts <= {"approved", "retry"} and not review.get("missing_dimensions"):
             retry_items = state["retry_items"]
             total = len(retry_items)
             logger.info("[Graph] route: %d 条 retry, 重新研究", total)
             return [Send("research_node", {**item, "researcher_id": f"Retry-{i+1}/{total}"}) for i, item in enumerate(retry_items)]
 
-        logger.info("[Graph] route: 需要 replan (verdicts=%s, missing=%s)", verdicts, bool(state["review_result"].missing_dimensions))
+        logger.info("[Graph] route: 需要 replan (verdicts=%s, missing=%s)", verdicts, bool(review.get("missing_dimensions")))
         return "plan_node"
 
     def plan_node(state: State) -> dict[str, SubQuestion]:
+        review_dict = state.get("review_result")
+        review = ReviewResult(**review_dict) if review_dict else None
         result = supervisor.plan(
             research_brief=state["research_brief"],
             approved_pairs=state.get("approved_pairs"),
-            review_result=state.get("review_result"),
+            review_result=review,
         )
         return {"sub_questions": result}
 
@@ -159,7 +162,7 @@ def build_graph(
         ]
 
         return {
-            "review_result": result,
+            "review_result": result.model_dump(),
             "approved_pairs": approved_pairs,
             "refine_round": state.get("refine_round", 0) + 1,
             "pending_review_pairs": [],
