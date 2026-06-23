@@ -33,7 +33,7 @@ async def lifespan(app: FastAPI):
     setup_logging(enable_display=False)
     orchestrator = Orchestrator(Config())
     app.state.orchestrator = orchestrator
-    app.state.clarifier = Clarifier(llm=orchestrator.llm_client)
+    app.state.clarifier = Clarifier(llm=orchestrator.llm_client, refine_temperature=orchestrator.config.llm.research_temperature)
     app.state.library_manager = orchestrator.create_library_manager()
     yield
     orchestrator.close()
