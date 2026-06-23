@@ -3,15 +3,21 @@
 import { useState } from "react";
 import QueryInput from "@/components/QueryInput";
 import ClarifyPanel from "@/components/ClarifyPanel";
+import ResearchProgress from "@/components/ResearchProgress";
+import ReportView from "@/components/ReportView";
+import StreamingText from "@/components/StreamingText";
 
 export default function Home() {
-  const [stage, setStage] = useState<"input" | "clarify" | "researching" | "report">("input");
+  const [stage, setStage] = useState<"input" | "sending" | "clarify" | "researching" | "report">("input");
   const [query, setQuery] = useState("");
   const [brief, setBrief] = useState("");
+  const [report, setReport] = useState("");
+  const [stats, setStats] = useState<{ total_calls: number; total_tokens: number } | null>(null);
 
   function handleQuerySubmit(q: string) {
     setQuery(q);
-    setStage("clarify");
+    setStage("sending");
+    setTimeout(() => setStage("clarify"), 400);
   }
 
   function handleBriefReady(b: string) {
@@ -19,33 +25,86 @@ export default function Home() {
     setStage("researching");
   }
 
+  const isReport = stage === "report";
+
   return (
-    <div className="flex flex-1 flex-col items-center px-4">
-      {stage === "input" && (
-        <>
-          <div className="flex flex-1 items-center justify-center">
-            <h1 className="text-3xl font-medium">SAGE Research</h1>
-          </div>
-          <div className="w-full flex justify-center pb-8">
-            <QueryInput onSubmit={handleQuerySubmit} />
-          </div>
-        </>
-      )}
-
-      {stage === "clarify" && (
-        <div className="flex flex-1 items-center justify-center">
-          <ClarifyPanel query={query} onBriefReady={handleBriefReady} />
+    <>
+      {(stage === "input" || stage === "sending") && (
+        <div className="flex flex-1 flex-col items-center px-4">
+          <HeroSection onSubmit={handleQuerySubmit} sending={stage === "sending"} />
         </div>
       )}
 
-      {stage === "researching" && (
-        <div className="flex flex-1 flex-col items-center pt-16 w-full max-w-2xl">
-          <div className="border-l-2 border-approved pl-4 mb-8">
-            <p className="text-lg italic">{brief}</p>
+      {stage !== "input" && stage !== "sending" && (
+        <div className="flex flex-1 w-full overflow-hidden min-h-0">
+          {/* Left spacer — provides centering, collapses on report */}
+          <div
+            className="transition-[flex] duration-700 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+            style={{ flex: isReport ? "0 0 0px" : "1 1 0px" }}
+          />
+
+          {/* Chat panel — fixed max-w-2xl, never changes size */}
+          <div className="w-full max-w-2xl shrink-0 overflow-y-auto min-h-0 px-4">
+            <div className="pt-10 pb-16 gap-4 flex flex-col">
+              <ClarifyPanel query={query} onBriefReady={handleBriefReady} />
+
+              {(stage === "researching" || isReport) && (
+                <ResearchProgress
+                  brief={brief}
+                  onReport={(r, s) => {
+                    setReport(r);
+                    if (s) setStats({ total_calls: s.total_calls, total_tokens: s.total_tokens });
+                    setStage("report");
+                  }}
+                />
+              )}
+            </div>
           </div>
-          <p className="text-muted-foreground">研究阶段（待实现）</p>
+
+          {/* Report panel — fills remaining space */}
+          <div
+            className={`flex-1 min-w-0 overflow-y-auto min-h-0 transition-opacity duration-500 ease-out ${
+              isReport
+                ? "opacity-100 border-l border-foreground/8 bg-surface/40"
+                : "opacity-0 pointer-events-none"
+            }`}
+          >
+            {report && <ReportView report={report} stats={stats} />}
+          </div>
         </div>
       )}
+    </>
+  );
+}
+
+function HeroSection({
+  onSubmit,
+  sending,
+}: {
+  onSubmit: (q: string) => void;
+  sending?: boolean;
+}) {
+  const [showSubtitle, setShowSubtitle] = useState(false);
+
+  return (
+    <div className={`flex flex-1 flex-col items-center w-full ${sending ? "hero-exit" : ""}`}>
+      <div className="flex flex-1 flex-col items-center justify-center">
+        <h1 className="text-4xl font-medium w-full text-center">
+          <StreamingText text="SAGE Research" mode="typewriter" speed="slow" pause={600} onComplete={() => setShowSubtitle(true)} />
+        </h1>
+        <div
+          className={`w-full overflow-hidden transition-all duration-1000 ease-[cubic-bezier(0.2,0.8,0.2,1)] ${
+            showSubtitle ? "max-h-16 opacity-100 mt-3" : "max-h-0 opacity-0 mt-0"
+          }`}
+        >
+          <p className="text-lg text-foreground/65 tracking-wide text-center pl-[1.1em]">
+            输入一个研究问题，开始探索。
+          </p>
+        </div>
+      </div>
+      <div className="w-full flex justify-center pb-8">
+        <QueryInput onSubmit={onSubmit} disabled={sending} />
+      </div>
     </div>
   );
 }
