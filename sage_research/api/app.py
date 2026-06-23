@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-import tempfile
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, UploadFile
@@ -79,36 +78,34 @@ def list_docs(request: Request):
 @app.post("/api/library/save-report")
 def save_report(body: SaveReportRequest, request: Request) -> IngestResult:
     library_manager: LibraryManager = request.app.state.library_manager
-    tmp = tempfile.NamedTemporaryFile(
-        mode="w", suffix=".md", delete=False, encoding="utf-8",
-        dir=library_manager.data_dir,
-    )
+    safe_name = body.title.replace("/", "_").replace("\\", "_")
+    src = os.path.join(library_manager.data_dir, f"{safe_name}.md")
     try:
-        tmp.write(body.content)
-        tmp.close()
+        with open(src, "w", encoding="utf-8") as f:
+            f.write(body.content)
         result = library_manager.ingest(
-            src=tmp.name, custom_title=body.title, overwrite=True
+            src=src, custom_title=body.title, overwrite=True
         )
     finally:
-        if os.path.exists(tmp.name):
-            os.unlink(tmp.name)
+        if os.path.exists(src):
+            os.unlink(src)
     return result
 
 
 @app.post("/api/library/upload")
 def upload_file(file: UploadFile, request: Request) -> IngestResult:
     library_manager: LibraryManager = request.app.state.library_manager
-    suffix = os.path.splitext(file.filename or "upload")[1] or ".pdf"
-    tmp = tempfile.NamedTemporaryFile(
-        delete=False, suffix=suffix, dir=library_manager.data_dir,
-    )
+    # 用原始文件名，避免临时文件名污染 originals 和 converted
+    filename = file.filename or "upload"
+    safe_name = filename.replace("/", "_").replace("\\", "_")
+    src = os.path.join(library_manager.data_dir, safe_name)
     try:
-        tmp.write(file.file.read())
-        tmp.close()
-        result = library_manager.ingest(src=tmp.name, overwrite=True)
+        with open(src, "wb") as f:
+            f.write(file.file.read())
+        result = library_manager.ingest(src=src, overwrite=True)
     finally:
-        if os.path.exists(tmp.name):
-            os.unlink(tmp.name)
+        if os.path.exists(src):
+            os.unlink(src)
     return result
 
 
