@@ -19,6 +19,10 @@ def pending_review_reducer(existing: list, new: list) -> list:
         return existing + new
 
 
+def merge_dicts(a: dict, b: dict) -> dict:
+    return {**(a or {}), **(b or {})}
+
+
 class State(TypedDict):
     research_brief: str
     sub_questions: list[SubQuestion]
@@ -29,6 +33,8 @@ class State(TypedDict):
     final_report: str
     retry_items: list[dict]
     review_summary: list[dict]
+    missing_dimensions: str
+    tool_call_counts: Annotated[dict, merge_dicts]
 
 
 class InputSchema(TypedDict):
@@ -94,10 +100,13 @@ def build_graph(
 
     def research_node(state: dict) -> dict:
         researcher = create_researcher(state.get("researcher_id", "R-?"))
-        result = researcher.run(
+        note, tool_call_counts = researcher.run(
             sub_question=state["sub_question"], note_feedback=state["note_feedback"]
         )
-        return {"pending_review_pairs": [(state["sub_question"], result)]}
+        return {
+            "pending_review_pairs": [(state["sub_question"], note)],
+            "tool_call_counts": tool_call_counts,
+        }
 
     def review_node(state: State) -> dict:
         result = supervisor.review(
@@ -128,7 +137,24 @@ def build_graph(
         ]
 
         review_summary = [
-            {"question": state["pending_review_pairs"][i][0], "verdict": nr.verdict}
+            {
+                "question": state["pending_review_pairs"][i][0],
+                "verdict": nr.verdict,
+                "failed": {
+                    "relevance": nr.verdict == "revise",
+                    "depth": "FAIL" in nr.depth,
+                    "citations": "FAIL" in nr.citations,
+                    "sources": "FAIL" in nr.sources,
+                    "completeness": "FAIL" in nr.completeness,
+                },
+                "evidence": {
+                    "relevance": nr.relevance,
+                    "depth": nr.depth,
+                    "citations": nr.citations,
+                    "sources": nr.sources,
+                    "completeness": nr.completeness,
+                },
+            }
             for i, nr in enumerate(result.note_reviews)
         ]
 
@@ -139,6 +165,7 @@ def build_graph(
             "pending_review_pairs": [],
             "retry_items": retry_items,
             "review_summary": review_summary,
+            "missing_dimensions": result.missing_dimensions,
         }
 
     def write_node(state: State) -> dict:

@@ -4,6 +4,7 @@ import logging
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from sage_research.agents import Clarifier
@@ -38,6 +39,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
 @app.post("/api/clarify")
@@ -97,7 +99,10 @@ def format_sse_events(events, llm_client: LLMClient):
                 if node_name == "plan_node":
                     event_type = "plan"
                     data = {
-                        "sub_questions": [sq.question for sq in output["sub_questions"]]
+                        "sub_questions": [
+                            {"label": sq.label, "question": sq.question}
+                            for sq in output["sub_questions"]
+                        ]
                     }
 
                 elif node_name == "research_node":
@@ -106,13 +111,23 @@ def format_sse_events(events, llm_client: LLMClient):
                     data = {
                         "question": question,
                         "preview": note[:PREVIEW_LENGTH] + "...",
+                        "tool_call_counts": output.get("tool_call_counts", {}),
                     }
 
                 elif node_name == "review_node":
                     event_type = "review"
                     data = {
                         "round": output["refine_round"],
-                        "review_summary": output["review_summary"],
+                        "review_summary": [
+                            {
+                                "question": r["question"],
+                                "verdict": r["verdict"],
+                                "failed": r["failed"],
+                                "evidence": r.get("evidence", {}),
+                            }
+                            for r in output["review_summary"]
+                        ],
+                        "missing_dimensions": output.get("missing_dimensions", ""),
                     }
 
                 elif node_name == "write_node":

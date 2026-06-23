@@ -134,7 +134,7 @@ class Researcher(AgentBase):
             len(result), "" if exhausted else f" (compress: {len(response.content)} -> {len(result)})",
         )
 
-        return result
+        return result, dict(tool_call_counts)
 
     def _compress(self, raw_research: str) -> str:
         messages = [
