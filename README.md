@@ -4,20 +4,65 @@
 
 **S**earch · **A**nalyze · **G**enerate · **E**valuate
 
-An autonomous multi-agent research system that breaks down complex questions,
-searches across web and academic sources in parallel, and synthesizes structured research reports.
+[![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python)](https://www.python.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=next.js)](https://nextjs.org/)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+
+An autonomous multi-agent research system. Ask a question, get a cited research report with inline references, rendered math, and PDF export.
 
 </div>
 
 ## Features
 
-- **Multi-Agent Pipeline** — Clarifier → Supervisor → Researcher ×N → Reviewer → Writer, orchestrated by LangGraph with iterative refinement (up to 3 rounds)
-- **Hybrid RAG** — Vector search + BM25 + RRF fusion + Cross-Encoder reranking; research reports auto-indexed for future retrieval
-- **MCP Tool Ecosystem** — Brave Search, Tavily, arXiv, Google Scholar, GitHub, PDF reader via Model Context Protocol
-- **Quality Gates** — Supervisor review with 4-criteria evidence scoring (relevance, depth, citations, sources), three-verdict routing (approved/retry/revise)
-- **Robustness** — Search fallback (Brave → Tavily), ReAct self-correction, tool result denoising, weak-model fallback parsing
-- **FastAPI Server** — REST + SSE streaming endpoints for web frontend integration
-- **Document Library** — Ingest arXiv papers, PDFs, and markdown into the shared RAG knowledge base
+- **Multi-Agent Pipeline** — Clarifier (scope refinement) → Supervisor (plan + review) → Researcher ×N (parallel search) → Writer (report synthesis). Up to 3 rounds of iterative refinement via LangGraph.
+- **Web Interface** — Next.js chat UI with streaming typewriter animations, research progress timeline, interactive report view with citation navigation, and PDF export.
+- **Hybrid Search** — Brave Search + Tavily (fallback), arXiv + Google Scholar (academic), GitHub code search.
+- **Local Knowledge Base** — RAG pipeline (chunking → embedding → hybrid retrieval → Cross-Encoder reranking). Upload PDFs, markdown, or arXiv papers; generated reports auto-index.
+- **Quality Review** — 5-criteria evidence scoring (relevance, depth, citations, sources, completeness) with three-verdict routing (approved/retry/revise).
+- **Mock Mode** — Frontend runs independently without backend for UI development and demos.
+- **Math Rendering** — LaTeX formula support ($...$ and $$...$$) via KaTeX.
+
+## Quick Start
+
+```bash
+git clone git@github.com:qinyu8028/sage-research.git
+cd sage-research
+./setup.sh
+```
+
+The script handles everything: conda environment, Python/Node dependencies, `.env` bootstrap, and starts both services. Open http://localhost:3000 in your browser.
+
+## Development
+
+### Backend Only
+
+```bash
+conda activate deep-research
+python server.py          # FastAPI on :8000
+```
+
+### Frontend Only (real backend)
+
+```bash
+cd web
+npm install
+npm run dev               # Next.js on :3000, assumes backend on :8000
+```
+
+### Frontend Only (mock mode, no backend)
+
+```bash
+cd web
+npm install
+npm run dev:mock          # Simulated SSE research pipeline
+```
+
+### CLI Mode
+
+```bash
+conda activate deep-research
+python -m sage_research.main
+```
 
 ## Architecture
 
@@ -65,16 +110,6 @@ searches across web and academic sources in parallel, and synthesizes structured
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Tech Stack
-
-- **LLM**: Multi-model support (GLM-4-Flash, DeepSeek, Qwen) via prefix routing
-- **Orchestration**: LangGraph (state graph with conditional routing and parallel fan-out)
-- **Search**: Brave Search + Tavily (fallback)
-- **Academic**: paper-search-mcp (arXiv + Google Scholar)
-- **RAG**: Custom pipeline (chunking → embedding → hybrid retrieval → reranking)
-- **Backend**: FastAPI + SSE streaming
-- **Tools**: MCP protocol + custom tool registry with per-agent whitelists
-
 ## Project Structure
 
 ```
@@ -90,26 +125,16 @@ sage_research/
 ├── library/    — Document converter, LibraryManager (ingest/list/delete)
 ├── api/        — FastAPI app, Pydantic schemas, SSE event formatting
 └── orchestrator.py — Infrastructure setup, research runner, resource management
-```
 
-## Quick Start
+web/            — Next.js frontend
+├── app/        — Page layout, global styles
+├── components/ — ClarifyPanel, ResearchProgress, ReportView,
+│                 LibraryDrawer, StreamingText, QueryInput
+└── lib/        — API client, mock SSE simulation
 
-```bash
-git clone git@github.com:qinyu8028/sage-research.git
-cd sage-research
-
-conda create -n deep-research python=3.14
-conda activate deep-research
-pip install -r requirements.txt
-
-# Configure API keys in .env
-cp .env.example .env
-
-# CLI mode
-python -m sage_research.main
-
-# Server mode (FastAPI)
-python server.py
+configs/        — MCP server config, agent tool whitelists
+tests/          — Unit + integration tests
+data/           — Runtime data (RAG index, downloads, library)
 ```
 
 ## API Endpoints
@@ -120,5 +145,36 @@ python server.py
 | POST | `/api/clarify/refine` | Refine query with user feedback into research brief |
 | POST | `/api/research` | Run full research pipeline (SSE stream) |
 | GET | `/api/library` | List indexed documents |
-| POST | `/api/library/ingest` | Add document to knowledge base |
+| POST | `/api/library/upload` | Upload file (PDF/MD/TXT) to knowledge base |
+| POST | `/api/library/save-report` | Save generated report to knowledge base |
+| POST | `/api/library/ingest` | Ingest document by arXiv ID or file path |
 | DELETE | `/api/library/{title}` | Remove document from knowledge base |
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GLM_API_KEY` | Yes | Zhipu GLM API key |
+| `LLM_MODEL_ID` | Yes | Model: `deepseek-v4-flash` or `glm-4.7` |
+| `GLM_BASE_URL` | Yes | GLM API endpoint |
+| `DEEPSEEK_API_KEY` | No | DeepSeek API key |
+| `DEEPSEEK_BASE_URL` | No | DeepSeek API endpoint |
+| `EMBEDDING_MODEL_ID` | Yes | Embedding model name |
+| `EMBEDDING_BASE_URL` | Yes | Embedding API endpoint |
+| `BRAVE_API_KEY` | No | Brave Search API key |
+| `TAVILY_API_KEY` | No | Tavily Search API key |
+| `HF_TOKEN` | No | HuggingFace token for reranker |
+| `GITHUB_TOKEN` | No | GitHub API token for code search |
+| `ARXIV_DOWNLOAD_DIR` | No | arXiv PDF download directory |
+| `RAG_DATA_DIR` | No | RAG data directory |
+| `http_proxy` / `https_proxy` | No | HTTP/S proxy for API calls |
+
+## Tech Stack
+
+**Backend:** Python 3.14, LangGraph, FastAPI, Uvicorn, Pydantic, OpenAI SDK, MCP
+
+**Frontend:** Next.js 16, React 19, Tailwind CSS 4, KaTeX, ReactMarkdown, rehype-raw
+
+**Search:** Brave Search, Tavily, arXiv API, Google Scholar, GitHub API
+
+**RAG:** Sentence-Transformers, Jieba, BM25, PyTorch, Cross-Encoder
