@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
+import { saveReport } from "@/lib/api";
 
 interface ReportViewProps {
   report: string;
@@ -64,11 +66,72 @@ const sourceComponents = {
   p: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
 };
 
+function extractTitle(md: string): string {
+  const m = md.match(/^#\s+(.+)$/m);
+  return m ? m[1].trim() : "research-report";
+}
+
 export default function ReportView({ report, stats }: ReportViewProps) {
   const { body, sourcesHeading, sources } = processReport(report);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
+
+  function handlePrint() {
+    const prev = document.title;
+    document.title = extractTitle(report);
+    window.print();
+    setTimeout(() => { document.title = prev; }, 100);
+  }
+
+  async function handleSave() {
+    if (saveState !== "idle") return;
+    setSaveState("saving");
+    try {
+      await saveReport(extractTitle(report), report);
+      setSaveState("saved");
+    } catch {
+      setSaveState("idle");
+    }
+  }
 
   return (
-    <div className="px-10 pt-12 pb-20">
+    <div className="px-10 pt-5 pb-20">
+      <div className="print-hide flex justify-end gap-2 mb-1.5">
+        <button
+          onClick={handleSave}
+          disabled={saveState !== "idle"}
+          className={`inline-flex items-center gap-1.5 text-[13px] rounded-lg px-3 py-1.5 active:scale-95 transition-all duration-200 ${
+            saveState === "saved"
+              ? "text-approved bg-approved/10 border border-approved/20"
+              : "text-foreground/70 bg-surface border border-foreground/10 hover:text-muted-foreground hover:bg-transparent hover:border-border"
+          } ${saveState === "saving" ? "opacity-60 cursor-wait" : ""}`}
+        >
+          {saveState === "saved" ? (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+              <path d="M20 6L9 17l-5-5" />
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+              <polyline points="17 21 17 13 7 13 7 21" />
+              <polyline points="7 3 7 8 15 8" />
+            </svg>
+          )}
+          {saveState === "saved" ? "已保存" : saveState === "saving" ? "保存中..." : "保存到文献库"}
+        </button>
+        <button
+          onClick={handlePrint}
+          className="inline-flex items-center gap-1.5 text-[13px] text-foreground/70 bg-surface border border-foreground/10 rounded-lg px-3 py-1.5 hover:text-muted-foreground hover:bg-transparent hover:border-border active:scale-95 transition-all duration-200"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10V4a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v6M5 10h14a2 2 0 0 1 2 2v3H3v-3a2 2 0 0 1 2-2z" />
+            <circle cx="12" cy="15" r="1" />
+          </svg>
+          下载 PDF
+        </button>
+      </div>
       <article className="report-prose" onClick={handleCitationClick}>
         <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
           {body}

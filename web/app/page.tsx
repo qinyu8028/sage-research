@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import QueryInput from "@/components/QueryInput";
-import ClarifyPanel from "@/components/ClarifyPanel";
+import ClarifyPanel, { resetClarifyCache } from "@/components/ClarifyPanel";
 import ResearchProgress from "@/components/ResearchProgress";
 import ReportView from "@/components/ReportView";
 import StreamingText from "@/components/StreamingText";
@@ -13,6 +13,7 @@ export default function Home() {
   const [brief, setBrief] = useState("");
   const [report, setReport] = useState("");
   const [stats, setStats] = useState<{ total_calls: number; total_tokens: number } | null>(null);
+  const [exiting, setExiting] = useState(false);
 
   function handleQuerySubmit(q: string) {
     setQuery(q);
@@ -23,6 +24,18 @@ export default function Home() {
   function handleBriefReady(b: string) {
     setBrief(b);
     setStage("researching");
+  }
+
+  function handleBack() {
+    setExiting(true);
+    setTimeout(() => {
+      resetClarifyCache();
+      setStage("input");
+      setBrief("");
+      setReport("");
+      setStats(null);
+      setExiting(false);
+    }, 350);
   }
 
   const isReport = stage === "report";
@@ -36,16 +49,32 @@ export default function Home() {
       )}
 
       {stage !== "input" && stage !== "sending" && (
-        <div className="flex flex-1 w-full overflow-hidden min-h-0">
+        <div className={`relative flex flex-1 w-full overflow-hidden min-h-0 ${exiting ? "back-exit" : ""}`}>
           {/* Left spacer — provides centering, collapses on report */}
           <div
             className="transition-[flex] duration-700 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
             style={{ flex: isReport ? "0 0 0px" : "1 1 0px" }}
           />
 
-          {/* Chat panel — fixed max-w-2xl, never changes size */}
-          <div className="w-full max-w-2xl shrink-0 overflow-y-auto min-h-0 px-4" data-scroll-container>
-            <div className="pt-10 pb-16 gap-4 flex flex-col">
+          {/* Chat panel */}
+          <div className="w-full max-w-3xl shrink-0 overflow-y-auto min-h-0 px-4 thin-scroll" data-scroll-container>
+            {/* Sticky back button — stays within chat panel bounds */}
+            <div
+              className="sticky top-0 z-10 pointer-events-none -mx-4 px-4"
+              style={{ background: "linear-gradient(to bottom, var(--background) 55%, transparent)", height: 50 }}
+            >
+              <button
+                onClick={handleBack}
+                className="pointer-events-auto mt-4 inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground active:scale-95 transition-all duration-200"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                  <path d="M19 12H5M12 19l-7-7 7-7" />
+                </svg>
+                返回
+              </button>
+            </div>
+            <div className="pb-16 gap-4 flex flex-col">
               <ClarifyPanel query={query} onBriefReady={handleBriefReady} />
 
               {(stage === "researching" || isReport) && (
@@ -61,9 +90,10 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Report panel — fills remaining space, capped for readability */}
+          {/* Report panel */}
           <div
-            className={`flex-1 min-w-0 overflow-y-auto min-h-0 transition-opacity duration-500 ease-out ${
+            data-report-panel
+            className={`flex-1 min-w-0 overflow-y-auto min-h-0 thin-scroll transition-opacity duration-500 ease-out ${
               isReport
                 ? "opacity-100 border-l border-foreground/8 bg-surface/40"
                 : "opacity-0 pointer-events-none"

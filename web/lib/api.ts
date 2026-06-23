@@ -1,4 +1,5 @@
-const API_BASE = "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+const MOCK = process.env.NEXT_PUBLIC_MOCK === "true";
 
 export interface ClarifyResult {
   is_clear: boolean;
@@ -12,6 +13,10 @@ export interface RefineResult {
 }
 
 export async function clarify(query: string): Promise<ClarifyResult> {
+  if (MOCK) {
+    const { mockClarify } = await import("./mock");
+    return mockClarify(query);
+  }
   const res = await fetch(`${API_BASE}/api/clarify`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -21,11 +26,48 @@ export async function clarify(query: string): Promise<ClarifyResult> {
 }
 
 export async function refine(query: string, response: string): Promise<RefineResult> {
+  if (MOCK) {
+    const { mockRefine } = await import("./mock");
+    return mockRefine(query, response);
+  }
   const res = await fetch(`${API_BASE}/api/clarify/refine`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query, response }),
   });
+  return res.json();
+}
+
+export interface SaveReportResult {
+  title: string;
+  status: "skipped" | "overwritten" | "created";
+}
+
+export async function saveReport(title: string, content: string): Promise<SaveReportResult> {
+  if (MOCK) {
+    return new Promise((resolve) => {
+      setTimeout(() => resolve({ title, status: "created" }), 500);
+    });
+  }
+  const res = await fetch(`${API_BASE}/api/library/save-report`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, content }),
+  });
+  return res.json();
+}
+
+export interface LibraryDoc {
+  title: string;
+  source_type: string;
+  added_at: string;
+}
+
+export async function listDocs(): Promise<LibraryDoc[]> {
+  if (MOCK) {
+    return [];
+  }
+  const res = await fetch(`${API_BASE}/api/library`);
   return res.json();
 }
 
@@ -43,6 +85,20 @@ export function startResearch(
   brief: string,
   onEvent: (event: ResearchEvent) => void,
 ): () => void {
+  if (MOCK) {
+    let cancelled = false;
+    let mockAbort: (() => void) | null = null;
+    import("./mock").then(({ startMockResearch }) => {
+      if (!cancelled) {
+        mockAbort = startMockResearch(brief, onEvent);
+      }
+    });
+    return () => {
+      cancelled = true;
+      mockAbort?.();
+    };
+  }
+
   const controller = new AbortController();
 
   fetch(`${API_BASE}/api/research`, {

@@ -1,6 +1,7 @@
 import json
-
 import logging
+import os
+import tempfile
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
@@ -18,6 +19,7 @@ from .schemas import (
     RefineRequest,
     RefineResult,
     ResearchRequest,
+    SaveReportRequest,
     IngestRequest,
     IngestResult,
 )
@@ -71,6 +73,25 @@ def research(body: ResearchRequest, request: Request):
 def list_docs(request: Request):
     library_manager: LibraryManager = request.app.state.library_manager
     result = library_manager.list_docs()
+    return result
+
+
+@app.post("/api/library/save-report")
+def save_report(body: SaveReportRequest, request: Request) -> IngestResult:
+    library_manager: LibraryManager = request.app.state.library_manager
+    tmp = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".md", delete=False, encoding="utf-8",
+        dir=library_manager.data_dir,
+    )
+    try:
+        tmp.write(body.content)
+        tmp.close()
+        result = library_manager.ingest(
+            src=tmp.name, custom_title=body.title, overwrite=True
+        )
+    finally:
+        if os.path.exists(tmp.name):
+            os.unlink(tmp.name)
     return result
 
 

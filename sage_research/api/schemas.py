@@ -26,6 +26,11 @@ class ResearchRequest(BaseModel):
     brief: str
 
 
+class SaveReportRequest(BaseModel):
+    title: str
+    content: str
+
+
 class IngestRequest(BaseModel):
     src: str
     custom_title: str | None = None

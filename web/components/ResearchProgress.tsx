@@ -71,10 +71,7 @@ export default function ResearchProgress({
       switch (event.type) {
         case "plan": {
           const subs = event.sub_questions;
-          setNodes((prev) => [
-            ...prev,
-            { kind: "plan", sub_questions: subs },
-          ]);
+          setNodes((prev) => [...prev, { kind: "plan", sub_questions: subs }]);
           setTimeout(() => {
             setNodes((prev) => {
               const last = prev[prev.length - 1];
@@ -105,27 +102,48 @@ export default function ResearchProgress({
                 : [...last.sub_questions, { label: event.question, question: event.question }];
               next[next.length - 1] = { ...last, sub_questions: questions, completed: updated };
             } else {
-              // first research event: create research node
-              const planNode: PlanNode | undefined = [...prev].reverse().find(
-                (n): n is PlanNode => n.kind === "plan"
-              );
-              const subs = planNode?.sub_questions ?? [];
-              const completed = new Map<string, CompletedEntry>();
-              completed.set(event.question, {
-                preview: event.preview,
-                tool_call_counts: event.tool_call_counts,
-              });
-              next.push({ kind: "research", sub_questions: subs, completed });
+              // Late research event? Find existing research node, or skip if already past research
+              const pastResearch = next.some((n) => n.kind === "review" || n.kind === "write");
+              if (pastResearch) {
+                // Find the last research node and update it
+                for (let j = next.length - 1; j >= 0; j--) {
+                  if (next[j].kind === "research") {
+                    const rn = next[j] as ResearchNode;
+                    const updated = new Map(rn.completed);
+                    updated.set(event.question, {
+                      preview: event.preview,
+                      tool_call_counts: event.tool_call_counts,
+                    });
+                    next[j] = { ...rn, completed: updated };
+                    break;
+                  }
+                }
+              } else {
+                // First research event: create research node
+                const planNode: PlanNode | undefined = [...prev].reverse().find(
+                  (n): n is PlanNode => n.kind === "plan"
+                );
+                const subs = planNode?.sub_questions ?? [];
+                const completed = new Map<string, CompletedEntry>();
+                completed.set(event.question, {
+                  preview: event.preview,
+                  tool_call_counts: event.tool_call_counts,
+                });
+                next.push({ kind: "research", sub_questions: subs, completed });
+              }
             }
             return next;
           });
           break;
 
         case "review": {
-          const hasRevise = event.review_summary.some((r) => r.verdict === "revise");
-          const allApproved = event.review_summary.every((r) => r.verdict === "approved");
-
           setNodes((prev) => {
+            // Skip duplicate review for same round
+            if (prev.some((n) => n.kind === "review" && (n as ReviewNode).round === event.round)) {
+              return prev;
+            }
+            const hasRevise = event.review_summary.some((r) => r.verdict === "revise");
+            const allApproved = event.review_summary.every((r) => r.verdict === "approved");
             const labelMap = new Map<string, string>();
             for (const n of prev) {
               if (n.kind === "plan") {
@@ -274,7 +292,7 @@ export default function ResearchProgress({
   }
 
   return (
-    <div className="flex flex-col gap-1.5 bubble-enter">
+    <div className="w-full max-w-2xl flex flex-col gap-1.5 bubble-enter">
       {/* AssistantMsg header */}
       <div className="flex items-center gap-1.5 font-mono text-[10px] tracking-widest uppercase text-muted-foreground">
         <span className="w-1.5 h-1.5 rounded-full bg-foreground/70" />
@@ -283,7 +301,7 @@ export default function ResearchProgress({
 
       {/* Timeline */}
       <div className="relative pl-7">
-        <div className="absolute left-[13px] top-0 bottom-0 w-0.5 bg-foreground/8" />
+        <div className="absolute left-[13px] top-0 bottom-2 w-0.5 bg-foreground/8" />
 
         {/* Initial loading */}
         {nodes.length === 0 && !error && (
@@ -304,7 +322,9 @@ export default function ResearchProgress({
                 <TimelineDot active={isLatest} />
                 <NodeBubble>
                   <div className="flex items-center gap-1.5">
-                    <span className="p-1 -ml-1 shrink-0"><span className="block w-3.5 h-3.5" /></span>
+                    <span className="p-1 -ml-1 shrink-0 flex items-center justify-center">
+                      <span className={`block w-2 h-2 rounded-full ${node.done ? "bg-approved" : "bg-accent animate-pulse-dot"}`} />
+                    </span>
                     <span className="text-[14px] font-medium">{nodeLabel(node)}</span>
                   </div>
                   {!node.done && (
@@ -357,7 +377,9 @@ export default function ResearchProgress({
                     display: "grid",
                     gridTemplateRows: isExpanded ? "1fr" : "0fr",
                     opacity: isExpanded ? 1 : 0,
-                    transition: "grid-template-rows 0.4s ease, opacity 0.1s ease",
+                    transition: isExpanded
+                      ? "grid-template-rows 0.5s cubic-bezier(0.2,0.8,0.2,1), opacity 0.4s ease 0.08s"
+                      : "grid-template-rows 0.5s cubic-bezier(0.2,0.8,0.2,1) 0.05s, opacity 0.25s ease",
                   }}
                 >
                   <div style={{ overflow: "hidden" }}>
@@ -476,7 +498,7 @@ function TimelineDot({ active, error: isError }: { active?: boolean; error?: boo
 
 function NodeBubble({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl rounded-bl-sm bg-surface/80 px-4 py-3 shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
+    <div className="rounded-2xl rounded-bl-sm bg-surface/80 px-4 py-3 shadow-[0_1px_4px_rgba(0,0,0,0.04)] overflow-hidden">
       {children}
     </div>
   );

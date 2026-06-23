@@ -22,6 +22,10 @@ let _clarifyCache: {
   settled: boolean;
 } | null = null;
 
+export function resetClarifyCache() {
+  _clarifyCache = null;
+}
+
 export default function ClarifyPanel({
   query,
   onBriefReady,
@@ -42,6 +46,8 @@ export default function ClarifyPanel({
   const [settled, setSettled] = useState(() => hit?.settled ?? false);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const [inputFlash, setInputFlash] = useState(false);
+  const [revealDirections, setRevealDirections] = useState(!!hit);
+  const [revealBrief, setRevealBrief] = useState(!!hit);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -55,11 +61,12 @@ export default function ClarifyPanel({
     clarify(query).then((data) => {
       if (cancelled) return;
       if (data.is_clear && data.brief) {
+        const brief = data.brief;
         setMessages((prev) => [
           prev[0],
-          { id: nextId(), role: "assistant-brief", content: data.brief },
+          { id: nextId(), role: "assistant-brief", content: brief },
         ]);
-        onBriefReady(data.brief);
+        onBriefReady(brief);
       } else {
         setMessages((prev) => [
           prev[0],
@@ -106,6 +113,7 @@ export default function ClarifyPanel({
     if (!trimmed) return;
     setCustomInput("");
     setSettled(true);
+    setRevealBrief(false);
     const userMsgId = nextId();
     const loadingMsgId = nextId();
     setMessages((prev) => [
@@ -154,9 +162,9 @@ export default function ClarifyPanel({
           return (
             <AssistantMsg key={msg.id}>
               <p className={`text-[15px] leading-relaxed ${!settled ? "mb-4" : ""}`}>
-                <StreamingText text={msg.message} mode="word-fade" />
+                <StreamingText text={msg.message} mode="typewriter" onComplete={() => setRevealDirections(true)} />
               </p>
-              {!settled && (
+              {!settled && revealDirections && (
                 <>
                   <div className="flex flex-col gap-2.5">
                     {msg.directions.map((dir, j) => {
@@ -243,11 +251,13 @@ export default function ClarifyPanel({
           return (
             <AssistantMsg key={msg.id}>
               <p className="text-[15px] leading-relaxed">
-                <StreamingText text="好的，研究方向已确认，即将开始研究：" mode="word-fade" />
+                <StreamingText text="好的，研究方向已确认，即将开始研究：" mode="typewriter" onComplete={() => setRevealBrief(true)} />
               </p>
-              <p className="text-[15px] leading-relaxed mt-1.5 text-foreground/70">
-                {msg.content}
-              </p>
+              {revealBrief && (
+                <p className="text-[15px] leading-relaxed mt-1.5 text-foreground/70">
+                  <StreamingText text={msg.content} mode="typewriter" />
+                </p>
+              )}
             </AssistantMsg>
           );
         }
