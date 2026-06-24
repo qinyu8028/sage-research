@@ -28,7 +28,7 @@ analyze_schema = {
                 "suggested_directions": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "3-4 specific research directions the user can choose from. Populated when is_clear is false.",
+                    "description": "3-5 specific research directions the user can choose from. Populated when is_clear is false.",
                 },
                 "message": {
                     "type": "string",
@@ -42,10 +42,10 @@ analyze_schema = {
 
 
 class Clarifier:
-    def __init__(self, llm: llm_client, system_prompt: str = CLARIFIER_SYSTEM, refine_temperature: float = 0.6):
+    def __init__(self, llm: llm_client, system_prompt: str = CLARIFIER_SYSTEM, creative_temperature: float = 0.6):
         self.llm = llm
         self.system_prompt = system_prompt
-        self.refine_temperature = refine_temperature
+        self.creative_temperature = creative_temperature
 
     def run(self, raw_query: str) -> str:
         result = self.analyze(raw_query)
@@ -82,6 +82,7 @@ class Clarifier:
             messages=messages,
             tools=[analyze_schema],
             tool_choice={"type": "function", "function": {"name": "analyze_query"}},
+            temperature=1,
             tag="clarifier:analyze",
         )
 
@@ -116,7 +117,7 @@ class Clarifier:
                 raw_query=raw_query, user_response=user_response
             )},
         ]
-        refine_response = self.llm.invoke(messages=refine_messages, temperature=self.refine_temperature, tag="clarifier:refine")
+        refine_response = self.llm.invoke(messages=refine_messages, temperature=self.creative_temperature, tag="clarifier:refine")
         logger.info("[Clarifier] 生成 research_brief 完成")
 
         return refine_response.content

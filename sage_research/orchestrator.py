@@ -55,7 +55,7 @@ class Orchestrator:
         
     def run_research(self, brief: str):
         supervisor = Supervisor(llm=self.llm_client, context_builder=self.context_builder, max_steps=self.config.max_steps)
-        writer = Writer(llm=self.llm_client, context_builder=self.context_builder, temperature=self.config.llm.research_temperature)
+        writer = Writer(llm=self.llm_client, context_builder=self.context_builder, temperature=self.config.llm.writer_temperature)
 
         # make sure that every researcher's history is independent
         def create_researcher(researcher_id: str = "R-?"):

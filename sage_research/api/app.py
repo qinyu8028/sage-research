@@ -1,6 +1,8 @@
 import json
 import logging
 import os
+import shutil
+import tempfile
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, UploadFile
@@ -33,7 +35,7 @@ async def lifespan(app: FastAPI):
     setup_logging(enable_display=False)
     orchestrator = Orchestrator(Config())
     app.state.orchestrator = orchestrator
-    app.state.clarifier = Clarifier(llm=orchestrator.llm_client, refine_temperature=orchestrator.config.llm.research_temperature)
+    app.state.clarifier = Clarifier(llm=orchestrator.llm_client, creative_temperature=orchestrator.config.llm.research_temperature)
     app.state.library_manager = orchestrator.create_library_manager()
     yield
     orchestrator.close()
@@ -79,7 +81,8 @@ def list_docs(request: Request):
 def save_report(body: SaveReportRequest, request: Request) -> IngestResult:
     library_manager: LibraryManager = request.app.state.library_manager
     safe_name = body.title.replace("/", "_").replace("\\", "_")
-    src = os.path.join(library_manager.data_dir, f"{safe_name}.md")
+    tmp_dir = tempfile.mkdtemp(dir=library_manager.data_dir)
+    src = os.path.join(tmp_dir, f"{safe_name}.md")
     try:
         with open(src, "w", encoding="utf-8") as f:
             f.write(body.content)
@@ -88,25 +91,23 @@ def save_report(body: SaveReportRequest, request: Request) -> IngestResult:
             save_original=False,
         )
     finally:
-        if os.path.exists(src):
-            os.unlink(src)
+        shutil.rmtree(tmp_dir, ignore_errors=True)
     return result
 
 
 @app.post("/api/library/upload")
 def upload_file(file: UploadFile, request: Request) -> IngestResult:
     library_manager: LibraryManager = request.app.state.library_manager
-    # 用原始文件名，避免临时文件名污染 originals 和 converted
-    filename = file.filename or "upload"
+    filename = file.filename or "upload.pdf"
     safe_name = filename.replace("/", "_").replace("\\", "_")
-    src = os.path.join(library_manager.data_dir, safe_name)
+    tmp_dir = tempfile.mkdtemp(dir=library_manager.data_dir)
+    src = os.path.join(tmp_dir, safe_name)
     try:
         with open(src, "wb") as f:
             f.write(file.file.read())
         result = library_manager.ingest(src=src, overwrite=True)
     finally:
-        if os.path.exists(src):
-            os.unlink(src)
+        shutil.rmtree(tmp_dir, ignore_errors=True)
     return result
 
 
