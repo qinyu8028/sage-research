@@ -198,6 +198,23 @@ The system auto-detects your LLM provider from the model name prefix. Only confi
 | `HF_TOKEN` | HuggingFace — enables faster Cross-Encoder reranker download |
 | `http_proxy` / `https_proxy` | Network proxy |
 
+## Tool Inventory
+
+Researchers select from these tools at each ReAct step, classified by cost tier:
+
+| Tool | Source | Cost Tier | Description |
+|------|--------|-----------|-------------|
+| `search` | Built-in | Low | Web search via Brave (primary) with Tavily fallback. Returns ranked snippets |
+| `mcp__fetch__fetch` | MCP | High | Fetch full page content from a URL. Results pass through LLM denoising |
+| `mcp__paper-search__search_arxiv` | MCP | Low | Search arXiv papers by keyword. Returns titles, abstracts, and IDs |
+| `mcp__paper-search__search_google_scholar` | MCP | Low | Search Google Scholar. Returns titles, snippets, and links |
+| `read_arxiv_paper` | Built-in | High | Download and read an arXiv paper by ID via pdfmux conversion |
+| `mcp__github__search_repositories` | MCP | Low | Search GitHub repositories by keyword |
+| `mcp__github__search_code` | MCP | Low | Search code across GitHub repositories |
+| `rag_search` | Built-in | Free | Query the local RAG knowledge base (BM25 + vector + reranker) |
+
+Tool whitelists are configured per agent in `configs/agents.json`. MCP servers are defined in `configs/mcp_servers.json`.
+
 ## Tech Stack
 
 **Backend:** Python 3.14, LangGraph, FastAPI, OpenAI SDK, MCP

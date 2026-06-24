@@ -111,6 +111,11 @@ class LLMClient:
         self.total_completion_tokens = 0
         self.total_calls = 0
 
+    def reset_stats(self):
+        self.total_prompt_tokens = 0
+        self.total_completion_tokens = 0
+        self.total_calls = 0
+
     def invoke(
         self,
         messages: list[dict[str, str]],

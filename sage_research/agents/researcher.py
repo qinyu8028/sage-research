@@ -36,18 +36,24 @@ class Researcher(AgentBase):
         max_steps: int = 3,
         system_prompt: str = RESEARCHER_SYSTEM_PROMPT,
         temperature: float = 0,
+        user_prompt_template: str = RESEARCHER_USER_PROMPT,
+        denoise_system_prompt: str = RESEARCHER_DENOISE_SYSTEM,
+        compress_system_prompt: str = RESEARCHER_COMPRESS_SYSTEM,
     ):
         super().__init__(name, llm, context_builder, system_prompt)
         self.max_steps = max_steps
         self.temperature = temperature
         self.tool_schema = [tool.to_schema() for tool in tool_list]
         self._tool_map = {tool.name: tool for tool in tool_list}
+        self.user_prompt_template = user_prompt_template
+        self.denoise_system_prompt = denoise_system_prompt
+        self.compress_system_prompt = compress_system_prompt
 
     def run(self, sub_question: str, note_feedback: str | None = None) -> str:
         logger.info("[Researcher:%s] run: retry=%s", self.name, bool(note_feedback))
 
         if not note_feedback:
-            prompt = RESEARCHER_USER_PROMPT.format(sub_question=sub_question)
+            prompt = self.user_prompt_template.format(sub_question=sub_question)
         else:
             prompt = RESEARCHER_RETRY_USER_PROMPT.format(sub_question=sub_question, note_feedback=note_feedback)
 
@@ -142,7 +148,7 @@ class Researcher(AgentBase):
 
     def _compress(self, raw_research: str) -> str:
         messages = [
-            {"role": "system", "content": RESEARCHER_COMPRESS_SYSTEM},
+            {"role": "system", "content": self.compress_system_prompt},
             {"role": "user", "content": RESEARCHER_COMPRESS_USER.format(raw_research=raw_research)}
         ]
         compress_response = self.llm.invoke(
@@ -229,7 +235,7 @@ class Researcher(AgentBase):
             return raw_tool_result
 
         messages = [
-            {"role": "system", "content": RESEARCHER_DENOISE_SYSTEM},
+            {"role": "system", "content": self.denoise_system_prompt},
             {"role": "user", "content": RESEARCHER_DENOISE_USER.format(
                 sub_question=sub_question, tool_result=raw_tool_result
             )}

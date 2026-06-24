@@ -175,6 +175,23 @@ data/           — 运行时数据（RAG 索引, 下载, 文献库）
 | `RAG_DATA_DIR` | 否 | RAG 数据目录 |
 | `http_proxy` / `https_proxy` | 否 | HTTP/S 代理 |
 
+## 工具清单
+
+Researcher 在每个 ReAct 步中从以下工具中选择，按成本分级：
+
+| 工具 | 来源 | 成本 | 描述 |
+|------|------|------|------|
+| `search` | 内置 | 低 | 网页搜索，Brave 优先 + Tavily 回退。返回排序摘要 |
+| `mcp__fetch__fetch` | MCP | 高 | 抓取完整网页内容。结果经 LLM 去噪 |
+| `mcp__paper-search__search_arxiv` | MCP | 低 | 按关键词搜索 arXiv 论文，返回标题、摘要和 ID |
+| `mcp__paper-search__search_google_scholar` | MCP | 低 | 搜索 Google Scholar，返回标题、摘要和链接 |
+| `read_arxiv_paper` | 内置 | 高 | 通过 pdfmux 下载并阅读 arXiv 论文 |
+| `mcp__github__search_repositories` | MCP | 低 | 按关键词搜索 GitHub 仓库 |
+| `mcp__github__search_code` | MCP | 低 | 跨仓库搜索 GitHub 代码 |
+| `rag_search` | 内置 | 免费 | 查询本地 RAG 知识库（BM25 + 向量 + 重排序） |
+
+工具白名单按 Agent 配置在 `configs/agents.json`，MCP 服务器定义在 `configs/mcp_servers.json`。
+
 ## 技术栈
 
 **后端：** Python 3.14, LangGraph, FastAPI, Uvicorn, Pydantic, OpenAI SDK, MCP

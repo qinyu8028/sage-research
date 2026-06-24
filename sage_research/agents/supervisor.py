@@ -65,9 +65,11 @@ class Supervisor(AgentBase):
         max_steps: int,
         name: str = "supervisor",
         system_prompt: str = SUPERVISOR_SYSTEM,
+        plan_user_prompt: str = SUPERVISOR_PLAN_USER,
     ):
         super().__init__(name, llm, context_builder, system_prompt)
         self.max_steps = max_steps
+        self.plan_user_prompt = plan_user_prompt
 
         subquestion_schema = SubQuestion.model_json_schema()
         self.output_schema = {
@@ -168,7 +170,7 @@ class Supervisor(AgentBase):
         """
 
         if review_result is None:
-            prompt = SUPERVISOR_PLAN_USER.format(research_brief=research_brief, max_steps=self.max_steps)
+            prompt = self.plan_user_prompt.format(research_brief=research_brief, max_steps=self.max_steps)
         else:
             approved_str = "\n".join(
                 f"- {q}" for q, _ in approved_pairs
