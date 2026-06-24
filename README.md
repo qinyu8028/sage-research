@@ -192,8 +192,6 @@ The system auto-detects your LLM provider from the model name prefix. Only confi
 | `HF_TOKEN` | HuggingFace — enables Cross-Encoder reranker download |
 | `http_proxy` / `https_proxy` | Network proxy |
 
-![SAGE Research](assets/screenshot.png)
-
 ## Tech Stack
 
 **Backend:** Python 3.14, LangGraph, FastAPI, OpenAI SDK, MCP
@@ -203,3 +201,7 @@ The system auto-detects your LLM provider from the model name prefix. Only confi
 **Retrieval:** Sentence-Transformers, BM25 + vector hybrid search, Cross-Encoder reranking
 
 **Data Sources:** Brave Search, Tavily, arXiv, Google Scholar, GitHub API
+
+## Frontend Preview
+
+![Frontend Preview](assets/screenshot.png)
