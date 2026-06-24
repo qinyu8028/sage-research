@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import asyncio
+import time
 import threading
 from concurrent.futures import Future
 
@@ -93,16 +94,33 @@ class MCPClient:
             self._connect_error = e
             self._ready_event.set()
 
-    def call_tool(self, name: str, args: dict[str, Any]):
+    def call_tool(self, name: str, args: dict[str, Any], _max_retries: int = 3):
         if self._loop is None:
             raise RuntimeError("MCPClient 未连接")
-        future = Future()
-        self._loop.call_soon_threadsafe(self._queue.put_nowait, (name, args, future))
-        result: CallToolResult = future.result()
 
-        if result.isError:
-            raise ToolCallError(message=f"工具调用失败: {result.content[0].text}", tool_name=name)
-        return "\n".join(item.text for item in result.content)
+        for attempt in range(_max_retries + 1):
+            future = Future()
+            self._loop.call_soon_threadsafe(self._queue.put_nowait, (name, args, future))
+            try:
+                result: CallToolResult = future.result()
+            except Exception as e:
+                if "already borrowed" in str(e).lower() and attempt < _max_retries:
+                    logger.warning("[MCP] %s: already borrowed, 重试 %d/%d", name, attempt + 1, _max_retries)
+                    time.sleep(0.5 * (attempt + 1))
+                    continue
+                raise
+
+            if result.isError:
+                error_text = result.content[0].text if result.content else "Unknown error"
+                if "already borrowed" in error_text.lower() and attempt < _max_retries:
+                    logger.warning("[MCP] %s: already borrowed, 重试 %d/%d", name, attempt + 1, _max_retries)
+                    time.sleep(0.5 * (attempt + 1))
+                    continue
+                raise ToolCallError(message=f"工具调用失败: {error_text}", tool_name=name)
+
+            return "\n".join(item.text for item in result.content)
+
+        raise ToolCallError(message="工具调用失败: already borrowed 重试次数用尽", tool_name=name)
 
     def disconnect(self):
         if self._thread is None:
