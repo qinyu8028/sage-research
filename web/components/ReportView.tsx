@@ -26,9 +26,15 @@ interface ProcessedReport {
 }
 
 function sanitizeMathDollars(text: string): string {
-  // 转义后跟数字的 $（货币符号如 $100），防止 remark-math 将其当作 LaTeX 分隔符
-  // 不影响 $x^2$ 这种真正的数学公式（$ 后跟字母）
-  return text.replace(/\$(?=\d)/g, "\\$");
+  // 单行 $$...$$ 拆成三行，remark-math 才识别为 display math
+  let out = text.replace(/^\$\$(.+)\$\$$/gm, "$$$$\n$1\n$$$$");
+  // 先保护真正的 LaTeX 对（$$...$$ 和 $...$），再转义剩余的独立 $数字（货币）
+  const saved: string[] = [];
+  const masked = out
+    .replace(/\$\$[\s\S]*?\$\$/g, (m) => { saved.push(m); return `\x00M${saved.length - 1}\x00`; })
+    .replace(/\$[^$\n]+\$/g, (m) => { saved.push(m); return `\x00M${saved.length - 1}\x00`; });
+  const escaped = masked.replace(/\$(?=\d)/g, "\\$");
+  return escaped.replace(/\x00M(\d+)\x00/g, (_, i) => saved[parseInt(i)]);
 }
 
 function processReport(raw: string): ProcessedReport {
@@ -108,7 +114,7 @@ export default function ReportView({ report, stats }: ReportViewProps) {
 
   return (
     <div className="px-10 pt-5 pb-20">
-      <div className="print-hide flex justify-end gap-2 mb-1.5">
+      <div className="print-hide flex justify-end gap-2 mb-5">
         <button
           onClick={handleSave}
           disabled={saveState !== "idle"}

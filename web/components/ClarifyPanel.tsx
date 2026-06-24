@@ -39,7 +39,7 @@ export default function ClarifyPanel({
     () =>
       hit?.messages ?? [
         { id: nextId(), role: "user", content: query.trim() },
-        { id: nextId(), role: "assistant-loading", content: "正在分析问题..." },
+        { id: nextId(), role: "assistant-loading", content: "正在分析问题" },
       ],
   );
   const [customInput, setCustomInput] = useState("");

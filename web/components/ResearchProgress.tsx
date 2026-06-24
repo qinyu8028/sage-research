@@ -315,6 +315,7 @@ export default function ResearchProgress({
 
         {nodes.map((node, i) => {
           const isLatest = i === nodes.length - 1;
+          const isRetry = node.kind === "research" && nodes.slice(0, i).some((n) => n.kind === "review");
 
           if (node.kind === "write") {
             return (
@@ -322,9 +323,11 @@ export default function ResearchProgress({
                 <TimelineDot active={isLatest} />
                 <NodeBubble>
                   <div className="flex items-center gap-1.5">
-                    <span className="p-1 -ml-1 shrink-0 flex items-center justify-center">
-                      <span className={`block w-2 h-2 rounded-full ${node.done ? "bg-approved" : "bg-accent animate-pulse-dot"}`} />
-                    </span>
+                    {node.done ? (
+                      <StatusLabel dot="bg-approved" text="已完成" color="text-approved" />
+                    ) : (
+                      <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse-dot" />
+                    )}
                     <span className="text-[14px] font-medium">{nodeLabel(node)}</span>
                   </div>
                   {!node.done && (
@@ -364,7 +367,7 @@ export default function ResearchProgress({
                       <path d="M4.5 2.5l4 3.5-4 3.5" />
                     </svg>
                   </button>
-                  <span className="text-[14px] font-medium">{nodeLabel(node)}</span>
+                  <span className="text-[14px] font-medium">{nodeLabel(node, isRetry)}</span>
                   {!isExpanded && (
                     <span className="text-[12px] text-muted-foreground/60 ml-0.5">
                       {nodeSummary(node)}
@@ -504,17 +507,18 @@ function NodeBubble({ children }: { children: React.ReactNode }) {
   );
 }
 
-function nodeLabel(node: TimelineNode): React.ReactNode {
+function nodeLabel(node: TimelineNode, isRetry = false): React.ReactNode {
   switch (node.kind) {
     case "plan":
       return `共分解出 ${node.sub_questions.length} 个子问题`;
     case "research": {
       const total = node.sub_questions.length;
       const done = node.completed.size;
+      const phase = isRetry ? "补充研究" : "资料收集";
       if (done === 0) {
         return (
           <span className="inline-flex items-center gap-2">
-            资料收集
+            {phase}
             <span className="dots-pulse"><i /><i /><i /></span>
           </span>
         );
@@ -522,12 +526,12 @@ function nodeLabel(node: TimelineNode): React.ReactNode {
       if (done < total) {
         return (
           <span className="inline-flex items-center gap-2">
-            资料收集中（{done}/{total}）
+            {phase}（{done}/{total}）
             <span className="dots-pulse"><i /><i /><i /></span>
           </span>
         );
       }
-      return `资料收集完成（${total}/${total}）`;
+      return `${phase}完成（${total}/${total}）`;
     }
     case "review":
       return `审查 · 第 ${node.round} 轮`;
@@ -631,7 +635,7 @@ function NodeContent({
                 {isExpanded && (
                   <div className="mt-1.5 ml-5 space-y-1">
                     <p className={`text-[13px] leading-snug ${!isDone ? "shimmer-text" : "text-foreground/50"}`}>
-                      {truncate(sq.question, 60)}
+                      {truncate(sq.question, 85)}
                     </p>
                     {isDone && toolUsage && (
                       <p className="text-[13px] text-foreground/30">
@@ -680,7 +684,7 @@ function NodeContent({
                     >
                       <path d="M5 2.5l3 3.5-3 3.5" />
                     </svg>
-                    <VerdictLabel verdict={r.verdict} />
+                    <VerdictLabel verdict={r.verdict} failed={r.failed} />
                     <span className="text-[14px] font-medium">{label}</span>
                   </button>
                   {isExpanded && (
@@ -719,14 +723,23 @@ function StatusLabel({ dot, text, color }: { dot: string; text: string; color: s
   );
 }
 
-function VerdictLabel({ verdict }: { verdict: Verdict }) {
+function VerdictLabel({ verdict, failed }: { verdict: Verdict; failed?: Record<string, boolean> }) {
   const config = {
     approved: { dot: "bg-approved", text: "通过", color: "text-approved" },
     retry: { dot: "bg-retry animate-pulse-dot", text: "重试", color: "text-retry" },
     revise: { dot: "bg-error", text: "修订", color: "text-error" },
   };
   const c = config[verdict];
-  return <StatusLabel dot={c.dot} text={c.text} color={c.color} />;
+  let label = c.text;
+  if (verdict !== "approved" && failed) {
+    const failedNames = Object.entries(failed)
+      .filter(([, v]) => v)
+      .map(([k]) => CRITERIA_LABELS[k] || k);
+    if (failedNames.length > 0) {
+      label += ` · ${failedNames.join("、")}`;
+    }
+  }
+  return <StatusLabel dot={c.dot} text={label} color={c.color} />;
 }
 
 const CRITERIA_LABELS: Record<string, string> = {
