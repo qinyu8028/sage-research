@@ -1,5 +1,11 @@
 <div align="center">
 
+[中文](README.zh-CN.md)
+
+</div>
+
+<div align="center">
+
 # SAGE Research
 
 **S**earch · **A**nalyze · **G**enerate · **E**valuate
@@ -159,7 +165,7 @@ data/           — Runtime data (RAG index, downloads, library)
 
 The system auto-detects your LLM provider from the model name prefix. Only configure the provider you use.
 
-**LLM (choose one):**
+**LLM (choose one provider):**
 
 | Provider | `LLM_MODEL_ID` | Required env vars |
 |----------|----------------|-------------------|
@@ -174,10 +180,10 @@ The system auto-detects your LLM provider from the model name prefix. Only confi
 
 | Variable | Description |
 |----------|-------------|
-| `EMBEDDING_MODEL_ID` | Embedding model, default `embedding-3` |
+| `EMBEDDING_MODEL_ID` | Embedding model, default `embedding-3` (Zhipu embedding model)|
 | `EMBEDDING_BASE_URL` | Embedding API endpoint |
 
-**Search (at least one required):**
+**Search (at least one required, strongly recommend both):**
 
 | Variable | Description |
 |----------|-------------|
@@ -189,7 +195,7 @@ The system auto-detects your LLM provider from the model name prefix. Only confi
 | Variable | Description |
 |----------|-------------|
 | `GITHUB_TOKEN` | GitHub API — enables code/repo search |
-| `HF_TOKEN` | HuggingFace — enables Cross-Encoder reranker download |
+| `HF_TOKEN` | HuggingFace — enables faster Cross-Encoder reranker download |
 | `http_proxy` / `https_proxy` | Network proxy |
 
 ## Tech Stack
