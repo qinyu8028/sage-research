@@ -12,7 +12,7 @@ An autonomous multi-agent research system that turns a question into a cited, st
 
 </div>
 
-![SAGE Research](assets/screenshot.png)
+
 
 ## Features
 
@@ -191,6 +191,8 @@ The system auto-detects your LLM provider from the model name prefix. Only confi
 | `GITHUB_TOKEN` | GitHub API — enables code/repo search |
 | `HF_TOKEN` | HuggingFace — enables Cross-Encoder reranker download |
 | `http_proxy` / `https_proxy` | Network proxy |
+
+![SAGE Research](assets/screenshot.png)
 
 ## Tech Stack
 
