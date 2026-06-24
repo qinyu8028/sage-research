@@ -4,9 +4,10 @@ from dataclasses import dataclass, field
 
 @dataclass
 class LLMConfig:
-    model: str = os.getenv("LLM_MODEL_ID", "GLM-4-Flash")
+    model: str = os.getenv("LLM_MODEL_ID", "deepseek-v4-flash")
     temperature: float = 0.0
     research_temperature: float = 0.6
+    writer_temperature: float = 0.3
     timeout: int = 120
 
 
