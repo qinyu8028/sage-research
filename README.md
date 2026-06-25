@@ -174,7 +174,7 @@ The system auto-detects your LLM provider from the model name prefix. Only confi
 | Google Gemini | `gemini-2.5-flash` | `GOOGLE_API_KEY`, `GOOGLE_BASE_URL` |
 | OpenAI | `gpt-4o` | `OPENAI_API_KEY` |
 | Anthropic | `claude-sonnet-4-6` | `ANTHROPIC_API_KEY` |
-| Alibaba Qwen | `qwen-plus` | `DASHSCOPE_API_KEY`, `DASHSCOPE_BASE_URL` |
+| Alibaba Qwen | `qwen-plus` | `QWEN_API_KEY`, `QWEN_BASE_URL` |
 
 **Embedding:**
 
@@ -194,6 +194,7 @@ The system auto-detects your LLM provider from the model name prefix. Only confi
 
 | Variable | Description |
 |----------|-------------|
+| `REVIEW_MODEL_ID` | Use a different model for quality review (e.g. `qwen3.7-plus`). Enables cross-model review to reduce self-consistency bias |
 | `GITHUB_TOKEN` | GitHub API — enables code/repo search |
 | `HF_TOKEN` | HuggingFace — enables faster Cross-Encoder reranker download |
 | `http_proxy` / `https_proxy` | Network proxy |

@@ -174,7 +174,7 @@ data/           — Runtime data (RAG index, downloads, library)
 | Google Gemini | `gemini-2.5-flash` | `GOOGLE_API_KEY`, `GOOGLE_BASE_URL` |
 | OpenAI | `gpt-4o` | `OPENAI_API_KEY` |
 | Anthropic | `claude-sonnet-4-6` | `ANTHROPIC_API_KEY` |
-| Alibaba Qwen | `qwen-plus` | `DASHSCOPE_API_KEY`, `DASHSCOPE_BASE_URL` |
+| Alibaba Qwen | `qwen-plus` | `QWEN_API_KEY`, `QWEN_BASE_URL` |
 
 **Embedding：**
 
@@ -194,6 +194,7 @@ data/           — Runtime data (RAG index, downloads, library)
 
 | 变量 | 描述 |
 |------|------|
+| `REVIEW_MODEL_ID` | 使用不同模型进行质量审查（如 `qwen3.7-plus`），启用跨模型审查以减少自一致性偏差 |
 | `GITHUB_TOKEN` | GitHub API -- 启用代码/仓库搜索 |
 | `HF_TOKEN` | HuggingFace -- 加速 Cross-Encoder reranker 下载 |
 | `http_proxy` / `https_proxy` | 网络代理 |
