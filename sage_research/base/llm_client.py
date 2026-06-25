@@ -29,8 +29,9 @@ MODEL_PROFILES = {
         "api_key": "OPENAI_API_KEY",
     },
     "qwen": {
-        "api_key": "DASHSCOPE_API_KEY",
-        "base_url": "DASHSCOPE_BASE_URL",
+        "api_key": "QWEN_API_KEY",
+        "base_url": "QWEN_BASE_URL",
+        "extra_body": {"enable_thinking": False},
     },
 }
 

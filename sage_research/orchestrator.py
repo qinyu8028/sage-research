@@ -54,7 +54,8 @@ class Orchestrator:
         self.researcher_tools = tool_registry.get_tools(whitelist)
         
     def run_research(self, brief: str):
-        supervisor = Supervisor(llm=self.llm_client, context_builder=self.context_builder, max_steps=self.config.max_steps)
+        review_llm = LLMClient(model=self.config.llm.review_model, timeout=self.config.llm.timeout) if self.config.llm.review_model else None
+        supervisor = Supervisor(llm=self.llm_client, context_builder=self.context_builder, max_steps=self.config.max_steps, review_llm=review_llm)
         writer = Writer(llm=self.llm_client, context_builder=self.context_builder, temperature=self.config.llm.writer_temperature)
 
         # make sure that every researcher's history is independent

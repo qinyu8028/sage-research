@@ -11,6 +11,8 @@ class TextChunker:
         splits = self._split_text(document.text)
         chunks = []
         for idx, text_split in enumerate(splits):
+            if not text_split.strip():
+                continue
             chunk = Chunk(
                 chunk_idx=idx, content=text_split, file_path=document.file_path
             )

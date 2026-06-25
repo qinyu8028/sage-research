@@ -66,10 +66,12 @@ class Supervisor(AgentBase):
         name: str = "supervisor",
         system_prompt: str = SUPERVISOR_SYSTEM,
         plan_user_prompt: str = SUPERVISOR_PLAN_USER,
+        review_llm: llm_client | None = None,
     ):
         super().__init__(name, llm, context_builder, system_prompt)
         self.max_steps = max_steps
         self.plan_user_prompt = plan_user_prompt
+        self.review_llm = review_llm
 
         subquestion_schema = SubQuestion.model_json_schema()
         self.output_schema = {
@@ -250,7 +252,8 @@ class Supervisor(AgentBase):
         self._history.append(review_msg)
         messages = self._build_messages()
 
-        response = self.llm.invoke(
+        review_llm = self.review_llm or self.llm
+        response = review_llm.invoke(
             messages=messages,
             tool_choice="required",
             tools=[self.review_schema],

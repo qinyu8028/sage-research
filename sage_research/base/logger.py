@@ -5,6 +5,8 @@ from datetime import datetime
 
 
 def setup_logging(log_dir: str = "logs", level: str = "DEBUG", enable_display: bool = True) -> None:
+    logging.getLogger("mcp.client.stdio").setLevel(logging.CRITICAL)
+
     logger = logging.getLogger("sage_research")
     logger.setLevel(logging.DEBUG)
 

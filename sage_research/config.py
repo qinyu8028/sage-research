@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 @dataclass
 class LLMConfig:
     model: str = os.getenv("LLM_MODEL_ID", "deepseek-v4-flash")
+    review_model: str = os.getenv("REVIEW_MODEL_ID", "")
     temperature: float = 0.0
     research_temperature: float = 0.6
     writer_temperature: float = 0.3
