@@ -1,4 +1,5 @@
 import json
+import json_repair
 import logging
 from typing import Literal
 
@@ -125,16 +126,23 @@ class Supervisor(AgentBase):
         则从 content 中解析 JSON，依次处理 markdown 代码块、函数名前缀、裸数组包装。
         """
         if response.tool_calls:
-            return json.loads(response.tool_calls[0].function.arguments)
+            raw = response.tool_calls[0].function.arguments
+        else:
+            raw = response.content.strip()
+            if raw.startswith("```"):
+                raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+            if raw.startswith(expected_func):
+                raw = raw[len(expected_func) :].strip()
 
-        content = response.content.strip()
-        if content.startswith("```"):
-            content = content.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-        if content.startswith(expected_func):
-            content = content[len(expected_func) :].strip()
-        if wrap_key and content.startswith("["):
-            return {wrap_key: json.loads(content)}
-        return json.loads(content)
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError as e:
+            logger.warning("[Supervisor] JSON 解析失败 (pos %d): %s，尝试修复", e.pos, e.msg)
+            parsed = json_repair.loads(raw)
+
+        if wrap_key and not response.tool_calls and isinstance(parsed, list):
+            return {wrap_key: parsed}
+        return parsed
 
     def _record_response(self, response: ChatCompletionMessage, result: dict):
         """
@@ -199,16 +207,19 @@ class Supervisor(AgentBase):
         self._history.append(brief_msg)
         messages = self._build_messages()
 
-        response = self.llm.invoke(
-            messages=messages,
-            tool_choice="required",
-            tools=[self.output_schema],
-            tag="supervisor:plan",
-        )
-
-        result = self._parse_tool_response(
-            response, "create_research_plan", wrap_key="sub_questions"
-        )
+        invoke_kwargs = dict(messages=messages, tool_choice="required",
+                              tools=[self.output_schema], tag="supervisor:plan")
+        try:
+            response = self.llm.invoke(**invoke_kwargs)
+            result = self._parse_tool_response(
+                response, "create_research_plan", wrap_key="sub_questions"
+            )
+        except (json.JSONDecodeError, ValueError):
+            logger.warning("[Supervisor] plan JSON 修复失败，重试一次")
+            response = self.llm.invoke(**invoke_kwargs)
+            result = self._parse_tool_response(
+                response, "create_research_plan", wrap_key="sub_questions"
+            )
         self._record_response(response, result)
 
         sub_questions = [SubQuestion(**item) for item in result["sub_questions"]]
@@ -253,14 +264,15 @@ class Supervisor(AgentBase):
         messages = self._build_messages()
 
         review_llm = self.review_llm or self.llm
-        response = review_llm.invoke(
-            messages=messages,
-            tool_choice="required",
-            tools=[self.review_schema],
-            tag="supervisor:review",
-        )
-
-        result = self._parse_tool_response(response, "submit_review", wrap_key="note_reviews")
+        invoke_kwargs = dict(messages=messages, tool_choice="required",
+                              tools=[self.review_schema], tag="supervisor:review")
+        try:
+            response = review_llm.invoke(**invoke_kwargs)
+            result = self._parse_tool_response(response, "submit_review", wrap_key="note_reviews")
+        except (json.JSONDecodeError, ValueError):
+            logger.warning("[Supervisor] review JSON 修复失败，重试一次")
+            response = review_llm.invoke(**invoke_kwargs)
+            result = self._parse_tool_response(response, "submit_review", wrap_key="note_reviews")
         self._record_response(response, result)
 
         review_result = ReviewResult(**result)
