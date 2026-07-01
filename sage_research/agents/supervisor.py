@@ -152,10 +152,12 @@ class Supervisor(AgentBase):
         """
         if response.tool_calls:
             tc = response.tool_calls[0]
+            fixed_tc = tc.model_dump()
+            fixed_tc["function"]["arguments"] = json.dumps(result, ensure_ascii=False)
             self._history.append(Message(
                 content=response.content,
                 role="assistant",
-                tool_calls=[tc.model_dump() for tc in response.tool_calls],
+                tool_calls=[fixed_tc],
             ))
             self._history.append(Message(
                 content=json.dumps(result, ensure_ascii=False),
