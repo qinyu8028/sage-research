@@ -12,6 +12,39 @@ class ConvertMetadata(BaseModel):
     title: str
 
 
+def get_conversion_metadata(
+    src: str,
+    output_dir: str,
+    custom_title: str | None = None,
+) -> ConvertMetadata:
+    """解析文献源信息，但不写入文件。"""
+    is_arxiv_id = re.match(r"^\d{4}\.\d{4,5}", src)
+    if is_arxiv_id:
+        source_type = "arxiv"
+        title = custom_title or f"arXiv:{src}"
+    else:
+        ext = os.path.splitext(src)[-1].lower()
+        title = custom_title or os.path.splitext(os.path.basename(src))[0]
+
+        ext_to_type = {
+            ".pdf": "pdf",
+            ".md": "markdown",
+            ".markdown": "markdown",
+            ".txt": "text",
+        }
+        source_type = ext_to_type.get(ext)
+
+        if not source_type:
+            raise ValueError(f"不支持的文件类型: {ext}")
+
+    return ConvertMetadata(
+        output_path=os.path.join(output_dir, f"{title}.md"),
+        source_type=source_type,
+        arxiv_id=src if source_type == "arxiv" else None,
+        title=title,
+    )
+
+
 def convert_to_markdown(
     src: str,
     output_dir: str,
@@ -32,21 +65,9 @@ def convert_to_markdown(
         ConvertMetadata: output_path, source_type, arxiv_id, title
     """
 
-    is_arxiv_id = re.match(r"^\d{4}\.\d{4,5}", src)
-    if is_arxiv_id:
-        source_type = "arxiv"
-        title = custom_title or f"arXiv:{src}"
-    else:
-        ext = os.path.splitext(src)[-1].lower()
-        title = custom_title or os.path.splitext(os.path.basename(src))[0]
-
-        ext_to_type = {".pdf": "pdf", ".md": "markdown", ".markdown": "markdown", ".txt": "text"}
-        source_type = ext_to_type.get(ext)
-
-        if not source_type:
-            raise ValueError(f"不支持的文件类型: {ext}")
-
-    dest = os.path.join(output_dir, f"{title}.md")
+    metadata = get_conversion_metadata(src, output_dir, custom_title)
+    source_type = metadata.source_type
+    dest = metadata.output_path
 
     if source_type == "arxiv":
         text = paper_tool.run_tool({"paper_id": src})
@@ -59,9 +80,4 @@ def convert_to_markdown(
     else:  # markdown / text
         shutil.copy(src, dest)
 
-    return ConvertMetadata(
-        output_path=dest,
-        source_type=source_type,
-        arxiv_id=src if source_type == "arxiv" else None,
-        title=title,
-    )
+    return metadata

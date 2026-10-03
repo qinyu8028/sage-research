@@ -4,7 +4,7 @@ import re
 import shutil
 from datetime import datetime
 
-from .converter import convert_to_markdown
+from .converter import convert_to_markdown, get_conversion_metadata
 from ..tools import PaperReaderTool
 from ..mcp import MCPTool
 from ..rag import Pipeline
@@ -31,7 +31,7 @@ class LibraryManager:
         os.makedirs(self.converted_dir, exist_ok=True)
 
     def ingest(
-        self, src: str, custom_title: str = None, overwrite: bool = True,
+        self, src: str, custom_title: str | None = None, overwrite: bool = True,
         save_original: bool = True,
     ) -> IngestResult:
 
@@ -46,6 +46,24 @@ class LibraryManager:
                         status="skipped"
                     )
 
+        pending_metadata = get_conversion_metadata(
+            src=src,
+            output_dir=self.converted_dir,
+            custom_title=custom_title,
+        )
+
+        existing = None
+        for entry in entries:
+            if entry["title"] == pending_metadata.title:
+                existing = entry
+                break
+
+        if existing and not overwrite:
+            return IngestResult(
+                title=pending_metadata.title,
+                status="skipped"
+            )
+
         metadata = convert_to_markdown(
             src=src,
             output_dir=self.converted_dir,
@@ -54,23 +72,10 @@ class LibraryManager:
             custom_title=custom_title,
         )
 
-        # dedup
-        existing = None
-        for entry in entries:
-            if entry["title"] == metadata.title:
-                existing = entry
-                break
-
         if existing:
-            if not overwrite:
-                return IngestResult(
-                    title=metadata.title,
-                    status="skipped"
-                )
-            else:
-                self._remove_files(existing)
-                entries.remove(existing)
-                status = "overwritten"
+            self._remove_files(existing, keep_converted_path=metadata.output_path)
+            entries.remove(existing)
+            status = "overwritten"
         else:
             status = "created"
 
@@ -129,11 +134,16 @@ class LibraryManager:
         with open(self.index_path, "w", encoding="utf-8") as f:
             json.dump(entries, f, ensure_ascii=False, indent=2)
     
-    def _remove_files(self, entry: dict):
+    def _remove_files(self, entry: dict, keep_converted_path: str | None = None):
         """清理 vector store + 磁盘文件，不 save, 需要额外调用save"""
-        self.pipeline.vector_store.remove_by_filepath(entry["converted_path"])
-        if os.path.exists(entry["converted_path"]):
-            os.remove(entry["converted_path"])
+        converted_path = entry["converted_path"]
+        self.pipeline.vector_store.remove_by_filepath(converted_path)
+        should_keep_converted = (
+            keep_converted_path is not None
+            and os.path.abspath(converted_path) == os.path.abspath(keep_converted_path)
+        )
+        if not should_keep_converted and os.path.exists(converted_path):
+            os.remove(converted_path)
         orig = entry.get("original_path")
         if orig and os.path.exists(orig):
             os.remove(orig)

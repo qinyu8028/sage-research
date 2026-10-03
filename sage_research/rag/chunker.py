@@ -35,7 +35,11 @@ class TextChunker:
             return splits
 
         else:
-            parts = text.split(separators[sep_level])
+            separator = separators[sep_level]
+            raw_parts = text.split(separator)
+            parts = [part + separator for part in raw_parts[:-1]]
+            if raw_parts[-1]:
+                parts.append(raw_parts[-1])
             splits = []
             small_splits = []
             for part in parts:
