@@ -183,6 +183,13 @@ The system auto-detects your LLM provider from the model name prefix. Only confi
 | `EMBEDDING_MODEL_ID` | Embedding model, default `embedding-3` (Zhipu embedding model)|
 | `EMBEDDING_BASE_URL` | Embedding API endpoint |
 
+**Reranker:**
+
+| Variable | Description |
+|----------|-------------|
+| `RERANK_MODEL_ID` | Cross-encoder reranker, default `BAAI/bge-reranker-v2-m3` |
+| `RERANK_MIN_SCORE` | Minimum sigmoid-normalized relevance score, default `0.5`; tune on a labeled retrieval set |
+
 **Search (at least one required, strongly recommend both):**
 
 | Variable | Description |
