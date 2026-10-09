@@ -68,11 +68,13 @@ class Supervisor(AgentBase):
         system_prompt: str = SUPERVISOR_SYSTEM,
         plan_user_prompt: str = SUPERVISOR_PLAN_USER,
         review_llm: llm_client | None = None,
+        plan_llm: llm_client | None = None,
     ):
         super().__init__(name, llm, context_builder, system_prompt)
         self.max_steps = max_steps
         self.plan_user_prompt = plan_user_prompt
         self.review_llm = review_llm
+        self.plan_llm = plan_llm
 
         subquestion_schema = SubQuestion.model_json_schema()
         self.output_schema = {
@@ -210,21 +212,25 @@ class Supervisor(AgentBase):
         messages = self._build_messages()
 
         invoke_kwargs = dict(messages=messages, tool_choice="required",
-                              tools=[self.output_schema], tag="supervisor:plan")
+                              tools=[self.output_schema], max_tokens=8192,
+                              tag="supervisor:plan")
+        plan_llm = self.plan_llm or self.llm
         try:
-            response = self.llm.invoke(**invoke_kwargs)
+            response = plan_llm.invoke(**invoke_kwargs)
             result = self._parse_tool_response(
                 response, "create_research_plan", wrap_key="sub_questions"
             )
+            sub_questions = [SubQuestion(**item) for item in result["sub_questions"]]
         except (json.JSONDecodeError, ValueError):
-            logger.warning("[Supervisor] plan JSON 修复失败，重试一次")
-            response = self.llm.invoke(**invoke_kwargs)
+            # JSON 修复失败或修复后结构仍无效（如输出被 max_tokens 截断）时重试一次
+            logger.warning("[Supervisor] plan 解析失败或结构无效，重试一次")
+            response = plan_llm.invoke(**invoke_kwargs)
             result = self._parse_tool_response(
                 response, "create_research_plan", wrap_key="sub_questions"
             )
+            sub_questions = [SubQuestion(**item) for item in result["sub_questions"]]
         self._record_response(response, result)
 
-        sub_questions = [SubQuestion(**item) for item in result["sub_questions"]]
         logger.info("[Supervisor] plan: 生成 %d 个子问题", len(sub_questions))
         return sub_questions
 
@@ -267,17 +273,20 @@ class Supervisor(AgentBase):
 
         review_llm = self.review_llm or self.llm
         invoke_kwargs = dict(messages=messages, tool_choice="required",
-                              tools=[self.review_schema], tag="supervisor:review")
+                              tools=[self.review_schema], max_tokens=16384,
+                              tag="supervisor:review")
         try:
             response = review_llm.invoke(**invoke_kwargs)
             result = self._parse_tool_response(response, "submit_review", wrap_key="note_reviews")
+            review_result = ReviewResult(**result)
         except (json.JSONDecodeError, ValueError):
-            logger.warning("[Supervisor] review JSON 修复失败，重试一次")
+            # JSON 修复失败或修复后结构仍无效（如 note_reviews 为空串）时重试一次。
+            # pydantic ValidationError 继承 ValueError，两个失败路径都走这里。
+            logger.warning("[Supervisor] review 解析失败或结构无效，重试一次")
             response = review_llm.invoke(**invoke_kwargs)
             result = self._parse_tool_response(response, "submit_review", wrap_key="note_reviews")
+            review_result = ReviewResult(**result)
         self._record_response(response, result)
-
-        review_result = ReviewResult(**result)
         for i, nr in enumerate(review_result.note_reviews):
             failed = nr.failed_criteria()
             if failed:
