@@ -1,6 +1,11 @@
 import json
 import os, logging, time
-from openai import OpenAI
+from openai import (
+    OpenAI,
+    APIConnectionError,
+    APITimeoutError,
+    InternalServerError,
+)
 from openai.types.chat import ChatCompletionMessage
 from openai.types.chat.chat_completion_message_tool_call import (
     ChatCompletionMessageToolCall, Function,
@@ -99,7 +104,13 @@ class LLMClient:
             )
             self.extra_body = None
             self.client = None
+            self._retryable_exceptions = (
+                anthropic.APIConnectionError,
+                anthropic.APITimeoutError,
+                anthropic.InternalServerError,
+            )
         else:
+            self._retryable_exceptions = ()
             if api_key and base_url:
                 self.extra_body = None
             else:
@@ -126,33 +137,54 @@ class LLMClient:
         max_tokens: int = 4096,
         tag: str = "",
     ) -> ChatCompletionMessage:
-        if self._is_claude:
-            return self._invoke_claude(
-                messages, temperature, tools, tool_choice, max_tokens, tag
-            )
+        # 连接类异常（网络抖动/代理重置/服务端 5xx）重试 2 次；业务错误（4xx）不重试。
+        # openai SDK 内部已有短间隔重试，这里是更粗粒度的兜底——评估期间实测
+        # WSL+代理环境下 DeepSeek 连接会间歇性重置，单次故障曾报废整格实验。
+        retry_delays = (5, 15)
+        label = f"[LLM:{tag}]" if tag else "[LLM]"
 
-        if tool_choice is None:
-            tool_choice = "auto" if tools else None
+        for attempt in range(len(retry_delays) + 1):
+            try:
+                if self._is_claude:
+                    return self._invoke_claude(
+                        messages, temperature, tools, tool_choice, max_tokens, tag
+                    )
 
-        start = time.time()
-        response = self.client.chat.completions.create(
-            messages=messages,
-            model=self.model,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            tool_choice=tool_choice,
-            tools=tools if tools else None,
-            extra_body=self.extra_body,
-        )
-        elapsed = time.time() - start
+                if tool_choice is None:
+                    tool_choice = "auto" if tools else None
 
-        msg = response.choices[0].message
-        self._track_usage(
-            response.usage.prompt_tokens,
-            response.usage.completion_tokens,
-            elapsed, tag, msg,
-        )
-        return msg
+                start = time.time()
+                response = self.client.chat.completions.create(
+                    messages=messages,
+                    model=self.model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    tool_choice=tool_choice,
+                    tools=tools if tools else None,
+                    extra_body=self.extra_body,
+                )
+                elapsed = time.time() - start
+
+                msg = response.choices[0].message
+                self._track_usage(
+                    response.usage.prompt_tokens,
+                    response.usage.completion_tokens,
+                    elapsed, tag, msg,
+                )
+                return msg
+            except Exception as e:
+                if attempt >= len(retry_delays) or not self._is_retryable(e):
+                    raise
+                logger.warning(
+                    "%s 连接类异常, %.0fs 后重试 (%d/%d): %s",
+                    label, retry_delays[attempt], attempt + 2, len(retry_delays) + 1, e,
+                )
+                time.sleep(retry_delays[attempt])
+
+    def _is_retryable(self, e) -> bool:
+        if isinstance(e, (APIConnectionError, APITimeoutError, InternalServerError)):
+            return True
+        return isinstance(e, getattr(self, "_retryable_exceptions", ()))
 
     # ---- Claude adapter ----
 
